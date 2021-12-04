@@ -25,11 +25,18 @@
               @change="holdFixChange"
             >
             </el-switch>
+            <el-switch
+              v-model="autoSave"
+              active-text="自动保存"
+              inactive-text="手动保存"
+              @change="holdsaveChange"
+            >
+            </el-switch>
           </el-container>
           <el-container class="aside-box">
             <el-row>
               <el-select
-                v-model="node1Name"
+                v-model="node1Id"
                 filterable
                 placeholder="实体1"
                 @change="selectNode1"
@@ -44,7 +51,7 @@
                 </el-option>
               </el-select>
               <el-select
-                v-model="node2Name"
+                v-model="node2Id"
                 filterable
                 placeholder="实体2"
                 @change="selectNode2"
@@ -97,6 +104,15 @@
               >
             </el-row>
           </el-container>
+          <el-container class="aside-box">
+            <el-button class="select-button" type="success" @click="saveData"
+              >保存</el-button
+            >
+            <input id="file" type="file" accept=".json" />
+            <el-button class="select-button" type="success" @click="importJson"
+              >上传</el-button
+            >
+          </el-container>
         </el-aside>
         <el-main>
           <div id="main"></div>
@@ -109,23 +125,31 @@
 </template>
 
 <script>
-// import HelloWorld from './components/HelloWorld.vue'
 import * as echarts from "echarts";
 import { ref } from "vue";
+import FileSaver from "file-saver";
 export default {
   name: "App",
   data() {
     return {
-      value1: true,
       graph: [],
       nodes: [],
+      links: [],
       filtedLinks: [],
       filtedNodes: [],
-      links: [],
-      node1: {},
-      node2: {},
+      options: ref([]),
+      history: [],
       chart: {},
       option: {},
+      node1: {},
+      node2: {},
+      node1Id: ref(""),
+      node2Id: ref(""),
+      relTypeNow: ref(""),
+      relValueNow: ref(""),
+      fixNodes: false,
+      nodeSwitch: 1,
+      autoSave: true,
       relValues: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
       relIdMap: [
         "Cause-Effect",
@@ -194,31 +218,21 @@ export default {
           id: 8,
         },
       ],
-      history: [],
-      options: ref([]),
-      node1Name: ref(""),
-      node2Name: ref(""),
-      relTypeNow: ref(""),
-      relValueNow: ref(""),
-      fixNodes: false,
-      nodeSwitch: 1,
     };
   },
   created() {},
-  components: {
-    // HelloWorld
-  },
   mounted() {
     this.initData();
     this.initGraph();
   },
   methods: {
     initData() {
-      var graph = require("./datas/echart_use_data_predict.json");
+      var graph = require("./datas/echart_use_data_predict.json"); //首先获取初始文件
       this.graph = graph;
       this.nodes = graph.nodes;
       this.links = graph.links;
       for (var node of this.nodes) {
+        // 创建option
         var option = {
           value: node.id,
           label: node.name,
@@ -229,12 +243,7 @@ export default {
     initGraph() {
       let main = echarts.init(document.getElementById("main"), "dark"); // 一键切换神色模式，有点给劲哦
       this.chart = main;
-      this.graph.nodes.forEach(function (node) {
-        node.label = {
-          show: node.symbolSize > 13,
-        };
-      });
-      let option = {
+      this.option = {
         title: {
           text: "实体与关系",
           subtext: "Default layout",
@@ -290,24 +299,26 @@ export default {
           },
         ],
       };
-      this.option = option;
-      var _this = this; // 让响应函数也能访问到vue
       this.filter();
-      main.setOption(option);
-
-      // 响应函数
+      main.setOption(this.option);
+      var _this = this; // 让响应函数也能访问到vue
       main.on("click", { dataType: "node" }, function (data) {
         console.log(data);
-        console.log(this.nodeSwitch)
         if (_this.nodeSwitch == 1) {
-          _this.node1Name = data.data.name;
-          _this.node1.id = data.data.id;
+          _this.node1Id = data.data.id;
+          _this.node1.name = data.data.name;
           _this.nodeSwitch = 2;
         } else {
-          _this.node2Name = data.data.name;
-          _this.node2.id = data.data.id;
+          _this.node2Id = data.data.id;
+          _this.node2.name = data.data.name;
           _this.nodeSwitch = 1;
         }
+      });
+      main.on("dblclick", { dataType: "node" }, function (data) {
+        console.log(data);
+        // 删除节点
+        // 删除与之相连的关系
+        // 删除option选项
       });
       main.on("dblclick", { dataType: "edge" }, function (data) {
         console.log(data);
@@ -316,23 +327,41 @@ export default {
             if (data.data.target == _this.links[i].target) {
               if (data.data.value == _this.links[i].value) {
                 _this.links.splice(i, 1);
+                let a = null;
+                let b = null;
+                for (var j = 0; j < _this.options.length; j++) {
+                  if (_this.options[j].value == _this.links[i].source) {
+                    a = _this.options[j].label;
+                    break;
+                  }
+                }
+                for (j = 0; j < _this.options.length; j++) {
+                  if (_this.options[j].value == _this.links[i].target) {
+                    b = _this.options[j].label;
+                    break;
+                  }
+                }
+                let his = {
+                  type: "delRel",
+                  node1Name: a,
+                  node2Name: b,
+                  relType: _this.links[i].value,
+                };
+                _this.history.push(his);
                 break;
               }
             }
           }
         }
+        if (_this.autoSave) {
+          _this.saveData();
+        }
         _this.updateGraph();
       });
     },
     updateGraph() {
-      // this.chart.setOption({
-      //   series:[{
-      //     data: this.nodes,
-      //     links: this.links
-      //   }]
-      // })
       this.filter();
-      let main = echarts.init(document.getElementById("main"), "dark"); // 不懂这样为社么比注释掉的方法更快，但是确实更快
+      let main = echarts.init(document.getElementById("main"), "dark"); // 不懂这样为社么更快，但是确实更快
       main.setOption(this.option);
     },
     filter() {
@@ -340,6 +369,11 @@ export default {
       this.filtedNodes.splice(0);
 
       for (let node of this.nodes) {
+        // 是否显示节点标签
+        node.label = {
+          show: node.symbolSize > 13,
+        };
+        // 锁定解锁节点
         if (this.fixNodes) {
           node.fixed = true;
         } else {
@@ -348,14 +382,13 @@ export default {
         this.filtedNodes.push(node);
       }
       for (let link of this.links) {
-        console.log(this.relTypes[this.relIdMap.indexOf(link.value)].use);
+        // 过滤选定连接
         if (this.relTypes[this.relIdMap.indexOf(link.value)].use) {
           this.filtedLinks.push(link);
         }
       }
     },
     onChange(id) {
-      console.log(id);
       if (this.relTypes[id].use == true) {
         this.relTypes[id].use = false;
       } else {
@@ -365,18 +398,22 @@ export default {
     },
     mergeNodes() {
       // 合并两个节点
-      console.log(this.node1.id, this.node2.id);
-      this.history.push((this.node1.id, this.node2.id));
+      console.log(("merge", this.node1.name, this.node2.name));
+      let his = {
+        type: "merge",
+        node1Name: this.node1.name,
+        node2Name: this.node2.name,
+        relType: "NA",
+      };
+      this.history.push(his);
 
       // 合并节点的关系，重复的关系线要变粗
       var map1 = new Map();
       for (let i = 0; i < this.links.length; i++) {
-        if (this.links[i].source == this.node1.id) {
-          this.links[i].source = this.node2.id;
-          console.log(this.links[i].source);
-        } else if (this.links[i].target == this.node1.id) {
-          this.links[i].target = this.node2.id;
-          console.log(this.links[i].target);
+        if (this.links[i].source == this.node1Id) {
+          this.links[i].source = this.node2Id;
+        } else if (this.links[i].target == this.node1Id) {
+          this.links[i].target = this.node2Id;
         }
         var label =
           this.links[i].source +
@@ -410,47 +447,61 @@ export default {
         this.links.push(link);
       }
 
-      console.log("aaaaa", this.links);
-
       // 删除节点,更新节点大小
       var node1Size = 0;
       for (let i = 0; i < this.nodes.length; i++) {
-        if (this.nodes[i].id == this.node1.id) {
+        if (this.nodes[i].id == this.node1Id) {
           node1Size = this.nodes[i].symbolSize;
           this.nodes.splice(i, 1);
           break;
         }
       }
       for (let i = 0; i < this.nodes.length; i++) {
-        if (this.nodes[i].id == this.node2.id) {
+        if (this.nodes[i].id == this.node2Id) {
           this.nodes[i].symbolSize = this.nodes[i].symbolSize + node1Size;
           break;
         }
       }
-
       // 删除option中对应节点
       for (var i = 0; i < this.options.length; i++) {
-        if (this.options[i].value == this.node1.id) {
-          console.log(this.options[i]);
+        if (this.options[i].value == this.node1Id) {
           this.options.splice(i, 1);
-          console.log(this.options[i]);
-          this.node1.id = -1;
-          this.value = "";
+          this.node1Id = null;
+          this.node1.name = null;
           break;
         }
+      }
+      if (this.autoSave) {
+        this.saveData();
       }
       this.updateGraph();
     },
     selectNode1(v) {
-      this.node1.id = v;
+      this.node1Id = v;
+      for (var i = 0; i < this.options.length; i++) {
+        if (this.options[i].value == this.node1Id) {
+          this.node1.name = this.options[i].label;
+          break;
+        }
+      }
+      this.chart.dispatchAction({
+        type: "highlight",
+        name: this.node1.name,
+      });
     },
     selectNode2(v) {
-      this.node2.id = v;
+      this.node2Id = v;
+      for (var i = 0; i < this.options.length; i++) {
+        if (this.options[i].value == this.node2Id) {
+          this.node2.name = this.options[i].label;
+          break;
+        }
+      }
     },
     addRel() {
       let newLink = {
-        source: this.node1.id,
-        target: this.node2.id,
+        source: this.node1Id,
+        target: this.node2Id,
         value: this.relTypeNow,
         lineStyle: {
           width: this.relValueNow,
@@ -460,12 +511,72 @@ export default {
         },
       };
       this.links.push(newLink);
+      let his = {
+        type: "addRel",
+        node1Name: this.node1.name,
+        node2Name: this.node2.name,
+        relType: this.relTypeNow,
+        relValue: this.relValueNow,
+      };
+      this.history.push(his);
+      if (this.autoSave) {
+        this.saveData();
+      }
       this.updateGraph();
     },
     holdFixChange(value) {
       this.fixNodes = value;
-      console.log(this.fixNodes);
       this.updateGraph();
+    },
+    holdsaveChange(value) {
+      this.autoSave = value;
+    },
+    saveData() {
+      let save = {
+        nodes: this.nodes,
+        links: this.links,
+        categories: this.graph.categories,
+        history: this.history,
+      };
+      let yy = new Date().getFullYear();
+      let mm = new Date().getMonth() + 1;
+      let dd = new Date().getDate();
+      let hh = new Date().getHours();
+      let mf =
+        new Date().getMinutes() < 10
+          ? "0" + new Date().getMinutes()
+          : new Date().getMinutes();
+      let ss =
+        new Date().getSeconds() < 10
+          ? "0" + new Date().getSeconds()
+          : new Date().getSeconds();
+      var fileName =
+        yy + "-" + mm + "-" + dd + "-" + hh + "-" + mf + "-" + ss + ".json";
+      const data = JSON.stringify(save);
+      const blob = new Blob([data], { type: "" });
+      FileSaver.saveAs(blob, fileName);
+    },
+    importJson() {
+      const file = document.getElementById("file").files[0];
+      const reader = new FileReader();
+      reader.readAsText(file);
+      const _this = this;
+      reader.onload = function () {
+        _this.graph = JSON.parse(this.result); //转成json对象
+        _this.nodes = _this.graph.nodes;
+        _this.links = _this.graph.links;
+        _this.categories = _this.graph.categories;
+        _this.history = _this.graph.history;
+        _this.options.splice(0);
+        for (var node of _this.nodes) {
+          var option = {
+            value: node.id,
+            label: node.name,
+          };
+          _this.options.push(option);
+        }
+        _this.updateGraph();
+      };
     },
   },
 };
@@ -475,6 +586,20 @@ export default {
 html {
   height: 100%;
 }
+#file{
+    outline-style: none;
+    border-radius: 4px;
+    padding: 8px;
+    color: white;
+    background-color: #67c23a;
+    margin-left: 5px;
+    margin-bottom: 5px;
+}
+
+#file-upload-button {
+  color: white !important;
+}
+
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -505,6 +630,9 @@ html {
   line-height: 100px;
 }
 
+.el-switch {
+  margin-left: 10px;
+}
 .el-main {
   background-color: #e9eef3;
   color: var(--el-text-color-primary);
