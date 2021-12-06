@@ -1,7 +1,7 @@
 <template>
   <div class="common-layout" style="height: 100%">
     <el-container style="height: 100%">
-      <el-header>Header</el-header>
+      <el-header class="iheader">斑岩铜矿知识图谱</el-header>
       <el-container>
         <el-aside width="400px">
           <el-container class="aside-box">
@@ -17,6 +17,26 @@
               >
             </el-row>
           </el-container>
+          <div class="slider-box">
+            <div class="slider-p">节点大小</div>
+            <el-slider
+              v-model="insSizeFilter"
+              @change="holdInsFilter"
+              range
+              show-stops
+              :max="maxSize"
+            >
+            </el-slider>
+            <div class="slider-p">关系强弱</div>
+            <el-slider
+              v-model="relSizeFilter"
+              @change="holdRelFilter"
+              range
+              show-stops
+              :max="maxWidth"
+            >
+            </el-slider>
+          </div>
           <el-container class="aside-box">
             <el-switch
               v-model="fixNodes"
@@ -162,29 +182,33 @@ export default {
         "Component-Whole",
         "Content-Container",
       ],
+      insSizeFilter: [4, 78], // 1-373训练 1-2080测试
+      relSizeFilter: [1, 12], // 1-10训练 1-277测试
+      maxSize: 98,
+      maxWidth: 10,
       relTypes: [
         {
           name: "Cause-Effect",
           color: "#626aef",
-          use: true,
+          use: false,
           id: 0,
         },
         {
           name: "Instrument-Agency",
           color: "#626aef",
-          use: true,
+          use: false,
           id: 1,
         },
         {
           name: "Message-Topic",
           color: "#626aef",
-          use: true,
+          use: false,
           id: 2,
         },
         {
           name: "Product-Producer",
           color: "#626aef",
-          use: true,
+          use: false,
           id: 3,
         },
         {
@@ -196,7 +220,7 @@ export default {
         {
           name: "Entity-Origin",
           color: "#626aef",
-          use: true,
+          use: false,
           id: 5,
         },
         {
@@ -208,7 +232,7 @@ export default {
         {
           name: "Component-Whole",
           color: "#626aef",
-          use: true,
+          use: false,
           id: 7,
         },
         {
@@ -227,10 +251,14 @@ export default {
   },
   methods: {
     initData() {
-      var graph = require("./datas/echart_use_data_predict.json"); //首先获取初始文件
+      var graph = require("./datas/echart_use_data_marked.json"); //首先获取初始文件
       this.graph = graph;
       this.nodes = graph.nodes;
       this.links = graph.links;
+      this.maxSize = graph.maxSize;
+      this.maxWidth = graph.maxWidth;
+
+      // 添加改变大小和颜色的前端映射
       for (var node of this.nodes) {
         // 创建option
         var option = {
@@ -239,6 +267,10 @@ export default {
         };
         this.options.push(option);
       }
+
+      this.options.sort(function (a, b) {
+        return ("" + a.label).localeCompare(b.label);
+      });
     },
     initGraph() {
       let main = echarts.init(document.getElementById("main"), "dark"); // 一键切换神色模式，有点给劲哦
@@ -275,7 +307,7 @@ export default {
             force: {
               repulsion: 200,
               gravity: 0.1,
-              edgeLength: [120, 200],
+              edgeLength: [400, 700],
             },
             data: this.filtedNodes,
             links: this.filtedLinks,
@@ -373,16 +405,43 @@ export default {
         node.label = {
           show: node.symbolSize > 13,
         };
+
         // 锁定解锁节点
         if (this.fixNodes) {
           node.fixed = true;
         } else {
           node.fixed = false;
         }
+
+        // 过滤大小
+        if (
+          node.symbolSize < this.insSizeFilter[0] ||
+          node.symbolSize > this.insSizeFilter[1]
+        ) {
+          if (
+            node.symbolSize > this.maxSize &&
+            this.insSizeFilter[1] == this.maxSize
+          ) {
+            this.filtedNodes.push(node);
+          }
+          continue;
+        }
         this.filtedNodes.push(node);
       }
       for (let link of this.links) {
         // 过滤选定连接
+        if (
+          link.lineStyle.width < this.relSizeFilter[0] ||
+          link.lineStyle.width > this.relSizeFilter[1]
+        ) {
+          if (
+            link.lineStyle.width > this.maxWidth &&
+            this.relSizeFilter[1] == this.maxWidth
+          ) {
+            this.filtedLinks.push(link);
+          }
+          continue;
+        }
         if (this.relTypes[this.relIdMap.indexOf(link.value)].use) {
           this.filtedLinks.push(link);
         }
@@ -531,6 +590,14 @@ export default {
     holdsaveChange(value) {
       this.autoSave = value;
     },
+    holdInsFilter() {
+      this.filter();
+      this.updateGraph();
+    },
+    holdRelFilter() {
+      this.filter();
+      this.updateGraph();
+    },
     saveData() {
       let save = {
         nodes: this.nodes,
@@ -586,14 +653,14 @@ export default {
 html {
   height: 100%;
 }
-#file{
-    outline-style: none;
-    border-radius: 4px;
-    padding: 8px;
-    color: white;
-    background-color: #67c23a;
-    margin-left: 5px;
-    margin-bottom: 5px;
+#file {
+  outline-style: none;
+  border-radius: 4px;
+  padding: 8px;
+  color: white;
+  background-color: #67c23a;
+  margin-left: 5px;
+  margin-bottom: 5px;
 }
 
 #file-upload-button {
@@ -615,6 +682,15 @@ html {
 #joinWord {
   font-size: 5px;
 }
+.slider-p {
+  margin: 0px !important;
+  height: 20px !important;
+  text-align: center;
+  line-height: 20px;
+}
+.slider-box {
+  padding: 10px 50px;
+}
 .el-header,
 .el-footer {
   background-color: #b3c0d1;
@@ -628,6 +704,7 @@ html {
   color: var(--el-text-color-primary);
   text-align: center;
   line-height: 100px;
+  padding-top: 10px;
 }
 
 .el-switch {
@@ -642,7 +719,7 @@ html {
 }
 
 .aside-box {
-  padding: 15px;
+  padding: 20px 15px 10px 15px;
 }
 
 .relTypeButton {
@@ -655,7 +732,10 @@ html {
   margin-left: 5px;
   margin-bottom: 5px;
 }
-
+.iheader {
+  color: white;
+  background-color:#150f38ce
+}
 .select-button {
   margin-left: 5px !important;
   margin-bottom: 5px !important;
