@@ -262,7 +262,7 @@ export default {
   },
   methods: {
     initData() {
-      var graph = require("./datas/echart_use_data_predict_5000.json"); //首先获取初始文件
+      var graph = require("./datas/echart_use_data_marked.json"); //首先获取初始文件
       this.graph = graph;
       this.nodes = graph.nodes;
       this.links = graph.links;
@@ -431,7 +431,7 @@ export default {
           show: node.symbolSize > 13,
         };
 
-        node.symbolSize = 5 + (node.symbolSize * Math.log(3))
+        // node.symbolSize = 5 + (node.symbolSize * Math.log(3))
 
         // 锁定解锁节点
         if (this.fixNodes) {
@@ -456,6 +456,7 @@ export default {
         this.filtedNodes.push(node);
       }
       for (let link of this.links) {
+        link.lineStyle.color = this.rel_color_map[link.value]
         // 过滤选定连接
         if (
           link.lineStyle.width < this.relSizeFilter[0] ||
