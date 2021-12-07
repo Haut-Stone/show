@@ -146,7 +146,7 @@
 
 <script>
 import * as echarts from "echarts";
-import { ref } from "vue";
+import {ref } from "vue";
 import FileSaver from "file-saver";
 export default {
   name: "App",
@@ -242,6 +242,17 @@ export default {
           id: 8,
         },
       ],
+      rel_color_map: {
+        "Instrument-Agency": "#ea7070",
+        "Cause-Effect": "#fdc4b6",
+        "Product-Producer": "#e59572",
+        "Content-Container": "#2694ab",
+        "Entity-Origin": "#a8dba8",
+        "Entity-Destination": "#f6d04d",
+        "Component-Whole": "#3f3f3f",
+        "Member-Collection": "#a696c8",
+        "Message-Topic": "#004d61",
+      },
     };
   },
   created() {},
@@ -251,7 +262,7 @@ export default {
   },
   methods: {
     initData() {
-      var graph = require("./datas/echart_use_data_marked.json"); //首先获取初始文件
+      var graph = require("./datas/echart_use_data_predict_5000.json"); //首先获取初始文件
       this.graph = graph;
       this.nodes = graph.nodes;
       this.links = graph.links;
@@ -319,7 +330,7 @@ export default {
               show: true, // 显示标签文字
             },
             lineStyle: {
-              color: "source",
+              // color: "source",
               curveness: 0.3,
             },
             emphasis: {
@@ -358,18 +369,31 @@ export default {
           if (data.data.source == _this.links[i].source) {
             if (data.data.target == _this.links[i].target) {
               if (data.data.value == _this.links[i].value) {
-                _this.links.splice(i, 1);
                 let a = null;
                 let b = null;
                 for (var j = 0; j < _this.options.length; j++) {
                   if (_this.options[j].value == _this.links[i].source) {
                     a = _this.options[j].label;
+                  }
+                  if (_this.options[j].value == _this.links[i].target) {
+                    b = _this.options[j].label;
+                  }
+                  if (a && b) {
                     break;
                   }
                 }
-                for (j = 0; j < _this.options.length; j++) {
-                  if (_this.options[j].value == _this.links[i].target) {
-                    b = _this.options[j].label;
+                var ct = 0;
+                for (j = 0; j < _this.nodes.length; j++) {
+                  if (
+                    _this.nodes[j].id == _this.links[i].source ||
+                    _this.nodes[j].id == _this.links[i].target
+                  ) {
+                    console.log(_this.links[i].source, _this.links[i].target);
+                    _this.nodes[j].symbolSize -= _this.links[i].lineStyle.width;
+                    console.log(_this.nodes[j]);
+                    ct += 1;
+                  }
+                  if (ct == 2) {
                     break;
                   }
                 }
@@ -379,6 +403,7 @@ export default {
                   node2Name: b,
                   relType: _this.links[i].value,
                 };
+                _this.links.splice(i, 1);
                 _this.history.push(his);
                 break;
               }
@@ -405,6 +430,8 @@ export default {
         node.label = {
           show: node.symbolSize > 13,
         };
+
+        node.symbolSize = 5 + (node.symbolSize * Math.log(3))
 
         // 锁定解锁节点
         if (this.fixNodes) {
@@ -497,6 +524,7 @@ export default {
           target: t,
           value: c,
           lineStyle: {
+            color: this.rel_color_map[c],
             width: temp[1],
           },
           labe: {
@@ -563,6 +591,7 @@ export default {
         target: this.node2Id,
         value: this.relTypeNow,
         lineStyle: {
+          color: this.rel_color_map[this.relTypeNow],
           width: this.relValueNow,
         },
         labe: {
@@ -570,6 +599,19 @@ export default {
         },
       };
       this.links.push(newLink);
+      var ct = 0;
+      for (var i = 0; i < this.nodes.length; i++) {
+        if (
+          this.nodes[i].id == this.node1Id ||
+          this.nodes[i].id == this.node2Id
+        ) {
+          this.nodes[i].symbolSize += this.relValueNow;
+          ct += 1;
+        }
+        if (ct == 2) {
+          break;
+        }
+      }
       let his = {
         type: "addRel",
         node1Name: this.node1.name,
@@ -642,6 +684,9 @@ export default {
           };
           _this.options.push(option);
         }
+        _this.options.sort(function (a, b) {
+          return ("" + a.label).localeCompare(b.label);
+        });
         _this.updateGraph();
       };
     },
@@ -734,7 +779,7 @@ html {
 }
 .iheader {
   color: white;
-  background-color:#150f38ce
+  background-color: #150f38ce;
 }
 .select-button {
   margin-left: 5px !important;
