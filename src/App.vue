@@ -122,6 +122,26 @@
               <el-button class="select-button" type="success" @click="addRel"
                 >新建</el-button
               >
+              <el-button class="button-label" type="primary" plain>{{
+                insNameNow
+              }}</el-button>
+              <el-select
+                v-model="insValueNow"
+                filterable
+                placeholder="实体类型"
+                class="select-box"
+              >
+                <el-option
+                  v-for="item in insIdMap"
+                  :key="item"
+                  :label="item"
+                  :value="item"
+                >
+                </el-option>
+              </el-select>
+              <el-button class="select-button" type="success" @click="changeIns"
+                >修改</el-button
+              >
             </el-row>
           </el-container>
           <el-container class="aside-box">
@@ -146,7 +166,7 @@
 
 <script>
 import * as echarts from "echarts";
-import {ref } from "vue";
+import { ref } from "vue";
 import FileSaver from "file-saver";
 export default {
   name: "App",
@@ -167,6 +187,8 @@ export default {
       node2Id: ref(""),
       relTypeNow: ref(""),
       relValueNow: ref(""),
+      insNameNow: ref(""),
+      insValueNow: ref(""),
       fixNodes: false,
       nodeSwitch: 1,
       autoSave: true,
@@ -182,8 +204,25 @@ export default {
         "Component-Whole",
         "Content-Container",
       ],
+      insIdMap: [
+        "ROCK",
+        "TECT",
+        "ALTE",
+        "PHYS",
+        "CHEM",
+        "CHRO",
+        "MINE",
+        "DEPO",
+        "DEEP",
+        "ELEM",
+      ],
       insSizeFilter: [4, 78], // 1-373训练 1-2080测试
       relSizeFilter: [1, 12], // 1-10训练 1-277测试
+      insSizeTable: [
+        5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90,
+        95, 100, 105, 110,
+      ],
+      relSizeTable: [],
       maxSize: 98,
       maxWidth: 10,
       relTypes: [
@@ -249,7 +288,7 @@ export default {
         "Content-Container": "#2694ab",
         "Entity-Origin": "#a8dba8",
         "Entity-Destination": "#f6d04d",
-        "Component-Whole": "#3f3f3f",
+        "Component-Whole": "#d0d9e0",
         "Member-Collection": "#a696c8",
         "Message-Topic": "#004d61",
       },
@@ -262,7 +301,28 @@ export default {
   },
   methods: {
     initData() {
-      var graph = require("./datas/echart_use_data_marked.json"); //首先获取初始文件
+      const req = this.axios.create({
+        baseURL: "",
+        headers: { "X-Custom-Header": "foobar" },
+        auth: {
+          username: "neo4j",
+          password: "159753zzz",
+        },
+        method: "post",
+      });
+      req
+        .post("http://192.168.103.246:7474/db/neo4j/tx", {
+          statements: [
+            {
+              statement: "MATCH (n:ALTE) RETURN n LIMIT 25",
+            },
+          ],
+        })
+        .then((response) => {
+          console.log(response.data);
+        });
+
+      var graph = require("./datas/2022-1-4-17-29-55.json"); //首先获取初始文件
       this.graph = graph;
       this.nodes = graph.nodes;
       this.links = graph.links;
@@ -296,7 +356,6 @@ export default {
         tooltip: {},
         legend: [
           {
-            // selectedMode: 'single',
             data: this.graph.categories.map(function (a) {
               return a.name;
             }),
@@ -309,7 +368,8 @@ export default {
             labelLayout: {
               hideOverlap: true, // 标签重叠自动隐藏
             },
-            draggable: false,
+            selectedMode: true,
+            draggable: true,
             edgeSymbol: ["circle", "arrow"], // 设置箭头
             edgeSymbolSize: [1, 6], // 设置箭头的大小
             name: "实体与关系",
@@ -318,7 +378,7 @@ export default {
             force: {
               repulsion: 200,
               gravity: 0.1,
-              edgeLength: [400, 700],
+              edgeLength: [150, 300],
             },
             data: this.filtedNodes,
             links: this.filtedLinks,
@@ -333,6 +393,7 @@ export default {
               // color: "source",
               curveness: 0.3,
             },
+            select: {},
             emphasis: {
               focus: "adjacency",
               lineStyle: {
@@ -346,7 +407,6 @@ export default {
       main.setOption(this.option);
       var _this = this; // 让响应函数也能访问到vue
       main.on("click", { dataType: "node" }, function (data) {
-        console.log(data);
         if (_this.nodeSwitch == 1) {
           _this.node1Id = data.data.id;
           _this.node1.name = data.data.name;
@@ -356,16 +416,65 @@ export default {
           _this.node2.name = data.data.name;
           _this.nodeSwitch = 1;
         }
+        _this.insValueNow = data.data.value;
+        _this.insNameNow = data.data.name;
       });
       main.on("dblclick", { dataType: "node" }, function (data) {
         console.log(data);
+
         // 删除节点
+        for (let i = 0; i < _this.nodes.length; i++) {
+          if (_this.nodes[i].id == data.data.id) {
+            _this.nodes.splice(i, 1);
+            break;
+          }
+        }
+
         // 删除与之相连的关系
+        for (let i = 0; i < _this.links.length; i++) {
+          if (
+            _this.links[i].source == data.data.id ||
+            _this.links[i].target == data.data.id
+          ) {
+            _this.links.splice(i, 1);
+          }
+        }
+
         // 删除option选项
+        for (let i = 0; i < _this.options.length; i++) {
+          if (_this.options[i].value == data.data.id) {
+            _this.options.splice(i, 1);
+            break;
+          }
+        }
+        _this.node1Id = null;
+        _this.node1.name = null;
+        _this.node2Id = null;
+        _this.node2.name = null;
+
+        // 保存历史记录
+        let his = {
+          type: "delIns",
+          name: data.data.name,
+          category: data.data.category,
+          symbolSize: data.data.symbolSize,
+          id: data.data.id,
+          value: data.data.value,
+        };
+        _this.history.push(his);
+        // 这里会接连调用dbclick边，不知道是bug还是细节
+        _this.updateGraph();
+      });
+      main.on("mouseup", { dataType: "node" }, function () {
+        _this.updateGraph();
       });
       main.on("dblclick", { dataType: "edge" }, function (data) {
-        console.log(data);
+        console.log("deleteRel", data);
         for (var i = 0; i < _this.links.length; i++) {
+          if (data.dataType == "node") {
+            console.log("发生传递");
+            break;
+          }
           if (data.data.source == _this.links[i].source) {
             if (data.data.target == _this.links[i].target) {
               if (data.data.value == _this.links[i].value) {
@@ -431,14 +540,14 @@ export default {
           show: node.symbolSize > 13,
         };
 
-        // node.symbolSize = 5 + (node.symbolSize * Math.log(3))
-
         // 锁定解锁节点
         if (this.fixNodes) {
           node.fixed = true;
         } else {
           node.fixed = false;
         }
+
+        let newNode = JSON.parse(JSON.stringify(node));
 
         // 过滤大小
         if (
@@ -449,14 +558,20 @@ export default {
             node.symbolSize > this.maxSize &&
             this.insSizeFilter[1] == this.maxSize
           ) {
-            this.filtedNodes.push(node);
+            if (node.symbolSize > 100) {
+              newNode.symbolSize =
+                2 + 40 * (2 + Math.log10(node.symbolSize / 100));
+            }
+            this.filtedNodes.push(newNode);
           }
           continue;
         }
-        this.filtedNodes.push(node);
+        newNode.symbolSize = 2 + 40 * (2 + Math.log10(node.symbolSize / 100));
+        this.filtedNodes.push(newNode);
       }
       for (let link of this.links) {
-        link.lineStyle.color = this.rel_color_map[link.value]
+        link.lineStyle.color = this.rel_color_map[link.value];
+        let newLink = JSON.parse(JSON.stringify(link));
         // 过滤选定连接
         if (
           link.lineStyle.width < this.relSizeFilter[0] ||
@@ -466,12 +581,20 @@ export default {
             link.lineStyle.width > this.maxWidth &&
             this.relSizeFilter[1] == this.maxWidth
           ) {
-            this.filtedLinks.push(link);
+            if (link.lineStyle.width > 30) {
+              newLink.lineStyle.width = 35;
+            }
+            // newLink.lineStyle.width = 1 + 20 * (10 + Math.log2(link.lineStyle.width / this.maxWidth + Math.pow(2, -10)));
+            this.filtedLinks.push(newLink);
           }
           continue;
         }
         if (this.relTypes[this.relIdMap.indexOf(link.value)].use) {
-          this.filtedLinks.push(link);
+          if (link.lineStyle.width > 30) {
+            newLink.lineStyle.width = 35;
+          }
+          // newLink.lineStyle.width = 1 + 20 * (10 + Math.log2(link.lineStyle.width / this.maxWidth + Math.pow(2, -10)));
+          this.filtedLinks.push(newLink);
         }
       }
     },
@@ -528,7 +651,7 @@ export default {
             color: this.rel_color_map[c],
             width: temp[1],
           },
-          labe: {
+          label: {
             formatter: "{c}",
           },
         };
@@ -572,6 +695,7 @@ export default {
           break;
         }
       }
+      console.log(this.node1.name);
       this.chart.dispatchAction({
         type: "highlight",
         name: this.node1.name,
@@ -585,6 +709,24 @@ export default {
           break;
         }
       }
+    },
+    changeIns() {
+      for (let i = 0; i < this.nodes.length; i++) {
+        if (this.nodes[i].name == this.insNameNow) {
+          this.nodes[i].value = this.insValueNow;
+          this.nodes[i].category = this.insIdMap.indexOf(this.insValueNow);
+          break;
+        }
+      }
+      let his = {
+        name: this.insNameNow,
+        value: this.insValueNow,
+      };
+      this.history.push(his);
+      if (this.autoSave) {
+        this.saveData();
+      }
+      this.updateGraph();
     },
     addRel() {
       let newLink = {
@@ -622,6 +764,7 @@ export default {
       };
       this.history.push(his);
       if (this.autoSave) {
+        console.log("addrel");
         this.saveData();
       }
       this.updateGraph();
@@ -703,7 +846,7 @@ html {
   outline-style: none;
   border-radius: 4px;
   padding: 8px;
-  color: white;
+  color: rgb(255, 255, 255);
   background-color: #67c23a;
   margin-left: 5px;
   margin-bottom: 5px;
@@ -777,6 +920,16 @@ html {
   width: 140px;
   margin-left: 5px;
   margin-bottom: 5px;
+}
+.button-label {
+  width: 140px;
+  margin-left: 5px !important;
+  margin-bottom: 5px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left !important;
+  padding: 12px 15px !important;
 }
 .iheader {
   color: white;
