@@ -54,6 +54,15 @@
             </el-switch>
           </el-container>
           <el-container class="aside-box">
+            <el-switch
+              v-model="queryMode"
+              active-text="推理模式"
+              inactive-text="构建模式"
+              @change="holdModeChange"
+            >
+            </el-switch>
+          </el-container>
+          <el-container class="aside-box">
             <el-row>
               <el-select
                 v-model="node1Id"
@@ -89,6 +98,7 @@
                 class="select-button"
                 type="success"
                 @click="mergeNodes"
+                :disabled="queryMode"
                 >合并</el-button
               >
               <el-select
@@ -96,6 +106,7 @@
                 filterable
                 placeholder="关系类型"
                 class="select-box"
+                :disabled="queryMode"
               >
                 <el-option
                   v-for="item in relIdMap"
@@ -110,6 +121,7 @@
                 filterable
                 placeholder="关系权重"
                 class="select-box"
+                :disabled="queryMode"
               >
                 <el-option
                   v-for="item in relValues"
@@ -119,17 +131,26 @@
                 >
                 </el-option>
               </el-select>
-              <el-button class="select-button" type="success" @click="addRel"
+              <el-button
+                class="select-button"
+                type="success"
+                @click="addRel"
+                :disabled="queryMode"
                 >新建</el-button
               >
-              <el-button class="button-label" type="primary" plain>{{
-                insNameNow
-              }}</el-button>
+              <el-button
+                class="button-label"
+                type="primary"
+                :disabled="queryMode"
+                plain
+                >{{ insNameNow }}</el-button
+              >
               <el-select
                 v-model="insValueNow"
                 filterable
                 placeholder="实体类型"
                 class="select-box"
+                :disabled="queryMode"
               >
                 <el-option
                   v-for="item in insIdMap"
@@ -139,17 +160,38 @@
                 >
                 </el-option>
               </el-select>
-              <el-button class="select-button" type="success" @click="changeIns"
+              <el-button
+                class="select-button"
+                type="success"
+                @click="changeIns"
+                :disabled="queryMode"
                 >修改</el-button
               >
             </el-row>
           </el-container>
           <el-container class="aside-box">
-            <el-button class="select-button" type="success" @click="saveData"
+            <el-button
+              class="select-button"
+              type="success"
+              @click="queryRequest"
+              :disabled="!queryMode"
+              >查看从V到Cu3跳以内的3个路径</el-button
+            >
+          </el-container>
+          <el-container class="aside-box">
+            <el-button
+              class="select-button"
+              type="success"
+              @click="saveData"
+              :disabled="queryMode"
               >保存</el-button
             >
-            <input id="file" type="file" accept=".json" />
-            <el-button class="select-button" type="success" @click="importJson"
+            <input id="file" type="file" accept=".json" :disabled="queryMode" />
+            <el-button
+              class="select-button"
+              type="success"
+              @click="importJson"
+              :disabled="queryMode"
               >上传</el-button
             >
           </el-container>
@@ -172,15 +214,15 @@ export default {
   name: "App",
   data() {
     return {
-      graph: [],
-      nodes: [],
-      links: [],
-      filtedLinks: [],
-      filtedNodes: [],
-      options: ref([]),
-      history: [],
-      chart: {},
-      option: {},
+      graph: [], // 初始图数据
+      nodes: [], // 初始节点数据
+      links: [], // 初始边数据
+      filtedNodes: [], // 过滤后的节点数据
+      filtedLinks: [], // 过滤后的边数据
+      options: ref([]), // 实体节点下拉选择框依赖的数据
+      history: [], // 修改历史
+      chart: {}, // 用来保存图实体
+      option: {}, // echart图的配置项参数
       node1: {},
       node2: {},
       node1Id: ref(""),
@@ -190,6 +232,7 @@ export default {
       insNameNow: ref(""),
       insValueNow: ref(""),
       fixNodes: false,
+      queryMode: false,
       nodeSwitch: 1,
       autoSave: true,
       relValues: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
@@ -223,7 +266,7 @@ export default {
         95, 100, 105, 110,
       ],
       relSizeTable: [],
-      maxSize: 98,
+      maxSize: 400,
       maxWidth: 10,
       relTypes: [
         {
@@ -281,6 +324,7 @@ export default {
           id: 8,
         },
       ],
+      // 关系显示颜色的映射表
       rel_color_map: {
         "Instrument-Agency": "#ea7070",
         "Cause-Effect": "#fdc4b6",
@@ -294,60 +338,43 @@ export default {
       },
     };
   },
-  created() {},
   mounted() {
     this.initData();
     this.initGraph();
+    this.initAxios();
   },
   methods: {
     initData() {
-      const req = this.axios.create({
-        baseURL: "",
-        headers: { "X-Custom-Header": "foobar" },
-        auth: {
-          username: "neo4j",
-          password: "159753zzz",
-        },
-        method: "post",
-      });
-      req
-        .post("http://192.168.103.246:7474/db/neo4j/tx", {
-          statements: [
-            {
-              statement: "MATCH (n:ALTE) RETURN n LIMIT 25",
-            },
-          ],
-        })
-        .then((response) => {
-          console.log(response.data);
-        });
-
-      var graph = require("./datas/2022-1-4-17-29-55.json"); //首先获取初始文件
+      // 获取完整的图文件
+      var graph = require("./datas/2022-1-4-17-29-55.json");
       this.graph = graph;
       this.nodes = graph.nodes;
       this.links = graph.links;
-      this.maxSize = graph.maxSize;
-      this.maxWidth = graph.maxWidth;
 
-      // 添加改变大小和颜色的前端映射
+      // 保存节点的最大size和边的最大width，在过滤器中使用
+      // this.maxSize = graph.maxSize;
+      // this.maxWidth = graph.maxWidth;
+
+      // 创建实体下拉选择框依赖的数据
       for (var node of this.nodes) {
-        // 创建option
         var option = {
           value: node.id,
           label: node.name,
         };
         this.options.push(option);
       }
-
       this.options.sort(function (a, b) {
         return ("" + a.label).localeCompare(b.label);
       });
     },
     initGraph() {
-      let main = echarts.init(document.getElementById("main"), "dark"); // 一键切换神色模式，有点给劲哦
+      let main = echarts.init(document.getElementById("main"), "dark");
       this.chart = main;
+
+      // 图的配置项
       this.option = {
         title: {
+          // 图标题
           text: "实体与关系",
           subtext: "Default layout",
           top: "bottom",
@@ -355,6 +382,7 @@ export default {
         },
         tooltip: {},
         legend: [
+          // 图正上方的实体类别选择按钮
           {
             data: this.graph.categories.map(function (a) {
               return a.name;
@@ -371,18 +399,19 @@ export default {
             selectedMode: true,
             draggable: true,
             edgeSymbol: ["circle", "arrow"], // 设置箭头
-            edgeSymbolSize: [1, 6], // 设置箭头的大小
+            edgeSymbolSize: [1, 10], // 设置箭头的大小
             name: "实体与关系",
             type: "graph",
             layout: "force",
             force: {
+              //力导布局参数
               repulsion: 200,
               gravity: 0.1,
               edgeLength: [150, 300],
             },
-            data: this.filtedNodes,
-            links: this.filtedLinks,
-            categories: this.graph.categories,
+            data: this.filtedNodes, // 实际用到的数据是过滤后的节点
+            links: this.filtedLinks, // 过滤后的关系
+            categories: this.graph.categories, // 分类
             roam: true,
             label: {
               position: "right",
@@ -403,10 +432,18 @@ export default {
           },
         ],
       };
+
+      // 进入初始过滤器，保证界面上的标签初始状态和数据的一致性
       this.filter();
+
+      // 设置图的配置项完成初始化
       main.setOption(this.option);
+      // 配置相应函数
       var _this = this; // 让响应函数也能访问到vue
       main.on("click", { dataType: "node" }, function (data) {
+        if (_this.queryMode) {
+          return; // 如果是查询模式直接返回
+        }
         if (_this.nodeSwitch == 1) {
           _this.node1Id = data.data.id;
           _this.node1.name = data.data.name;
@@ -420,6 +457,9 @@ export default {
         _this.insNameNow = data.data.name;
       });
       main.on("dblclick", { dataType: "node" }, function (data) {
+        if (_this.queryMode) {
+          return; // 如果是查询模式直接返回
+        }
         console.log(data);
 
         // 删除节点
@@ -469,6 +509,9 @@ export default {
         _this.updateGraph();
       });
       main.on("dblclick", { dataType: "edge" }, function (data) {
+        if (_this.queryMode) {
+          return; // 如果是查询模式直接返回
+        }
         console.log("deleteRel", data);
         for (var i = 0; i < _this.links.length; i++) {
           if (data.dataType == "node") {
@@ -525,17 +568,30 @@ export default {
         _this.updateGraph();
       });
     },
-    updateGraph() {
-      this.filter();
-      let main = echarts.init(document.getElementById("main"), "dark"); // 不懂这样为社么更快，但是确实更快
-      main.setOption(this.option);
+    initAxios() {
+      const req = this.axios.create({
+        baseURL: "",
+        headers: {
+          // Accept: 'application/json',
+          // charset:'utf-8',
+        },
+        // 认证用的属性
+        auth: {
+          username: "neo4j",
+          password: "159753zzz",
+        },
+        method: "post",
+      });
+      this.ax = req;
     },
     filter() {
+      // 清空列表数据
       this.filtedLinks.splice(0);
       this.filtedNodes.splice(0);
 
+      // 过滤节点状态
       for (let node of this.nodes) {
-        // 是否显示节点标签
+        // 节点size > 13则显示
         node.label = {
           show: node.symbolSize > 13,
         };
@@ -549,7 +605,7 @@ export default {
 
         let newNode = JSON.parse(JSON.stringify(node));
 
-        // 过滤大小
+        // 过滤节点大小
         if (
           node.symbolSize < this.insSizeFilter[0] ||
           node.symbolSize > this.insSizeFilter[1]
@@ -569,10 +625,13 @@ export default {
         newNode.symbolSize = 2 + 40 * (2 + Math.log10(node.symbolSize / 100));
         this.filtedNodes.push(newNode);
       }
+
+      // 补充显示参数，过滤边
       for (let link of this.links) {
         link.lineStyle.color = this.rel_color_map[link.value];
         let newLink = JSON.parse(JSON.stringify(link));
-        // 过滤选定连接
+
+        // 过滤选定边大小
         if (
           link.lineStyle.width < this.relSizeFilter[0] ||
           link.lineStyle.width > this.relSizeFilter[1]
@@ -581,22 +640,116 @@ export default {
             link.lineStyle.width > this.maxWidth &&
             this.relSizeFilter[1] == this.maxWidth
           ) {
-            if (link.lineStyle.width > 30) {
-              newLink.lineStyle.width = 35;
-            }
+            // if (link.lineStyle.width > 30) {
+            newLink.lineStyle.width = link.lineStyle.width * 2;
+            //
             // newLink.lineStyle.width = 1 + 20 * (10 + Math.log2(link.lineStyle.width / this.maxWidth + Math.pow(2, -10)));
             this.filtedLinks.push(newLink);
           }
           continue;
         }
+        // 过滤边是否使用
         if (this.relTypes[this.relIdMap.indexOf(link.value)].use) {
-          if (link.lineStyle.width > 30) {
-            newLink.lineStyle.width = 35;
-          }
+          // if (link.lineStyle.width > 30) {
+          newLink.lineStyle.width = link.lineStyle.width * 2;
+          // }
           // newLink.lineStyle.width = 1 + 20 * (10 + Math.log2(link.lineStyle.width / this.maxWidth + Math.pow(2, -10)));
           this.filtedLinks.push(newLink);
         }
       }
+    },
+    updateGraph() {
+      if (this.queryMode) {
+        this.queryFilter();
+      } else {
+        this.filter();
+      }
+      let main = echarts.init(document.getElementById("main"), "dark"); // 不懂这样为社么更快，但是确实更快
+      main.setOption(this.option);
+    },
+    queryFilter() {
+      // 调整锁定状态
+      for (let node of this.filtedNodes) {
+        if (this.fixNodes) {
+          node.fixed = true;
+        } else {
+          node.fixed = false;
+        }
+      }
+    },
+    queryDataHelper() {
+      var queryNodes = new Map();
+      var queryLinks = new Map();
+      console.log(this.responseData)
+      for (let path of this.responseData) {
+        const entitys = path.row[0];
+        for (let entity of entitys) {
+          if (entity.id != null) {
+            var la = entity.name + "@@@" + entity.id;
+            if (!queryNodes.has(la)) {
+              queryNodes.set(la, entity);
+            }
+          } else {
+            la =
+              entity.source + "@@@" + entity.target + "@@@" + entity.relation;
+            if (!queryLinks.has(la)) {
+              queryLinks.set(la, entity);
+            }
+          }
+        }
+      }
+
+
+      // 清空列表数据
+      this.filtedLinks.splice(0);
+      this.filtedNodes.splice(0);
+
+      for (let key of queryNodes) {
+        let node = key[1];
+        node.category = Number(node.category);
+        node.symbolSize =
+          2 + 40 * (2 + Math.log10(Number(node.symbolSize) / 100));
+        node.fixed = this.fixNodes;
+        this.filtedNodes.push(node);
+      }
+
+      for (let key of queryLinks) {
+        let link = key[1];
+        link.value = link.relation;
+        link.lineStyle = {
+          color: link.color,
+          width: link.width*2,
+        };
+        link.label = {
+          formatter: "{c}",
+        };
+        this.filtedLinks.push(link);
+      }
+
+      console.log(this.filtedNodes);
+      console.log(this.filtedLinks);
+
+      let main = echarts.init(document.getElementById("main"), "dark"); // 不懂这样为社么更快，但是确实更快
+      main.setOption(this.option);
+    },
+    queryRequest() {
+      this.ax
+        .post("http://192.168.103.246:7474/db/neo4j/tx", {
+          statements: [
+            {
+              statement:
+                "match (from{name:$name1}),(to{name:$name2}) match p=(from)-[*..10]->(to) return p LIMIT 5",
+                parameters:{
+                  name1: this.node1.name,
+                  name2: this.node2.name
+                }
+            },
+          ],
+        })
+        .then((response) => {
+          this.responseData = response.data.results[0].data;
+          this.queryDataHelper();
+        });
     },
     onChange(id) {
       if (this.relTypes[id].use == true) {
@@ -777,11 +930,28 @@ export default {
       this.autoSave = value;
     },
     holdInsFilter() {
-      this.filter();
       this.updateGraph();
     },
     holdRelFilter() {
-      this.filter();
+      this.updateGraph();
+    },
+    holdModeChange(value) {
+      this.queryMode = value;
+      if (value == true) {
+        for (let foo of this.relTypes) {
+          foo.use = true
+        }
+        this.insSizeFilter = [0, this.maxSize]
+        this.relSizeFilter = [0, this.maxWidth]
+        this.filtedLinks.splice(0);
+        this.filtedNodes.splice(0);
+      } else {
+        for (let foo of this.relTypes) {
+          foo.use = false
+        }
+        this.insSizeFilter = [4, 100]
+        this.relSizeFilter = [0, 5]
+      }
       this.updateGraph();
     },
     saveData() {
@@ -908,7 +1078,7 @@ html {
 }
 
 .aside-box {
-  padding: 20px 15px 10px 15px;
+  padding: 10px 15px 10px 15px;
 }
 
 .relTypeButton {
