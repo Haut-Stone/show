@@ -172,7 +172,7 @@
           </el-container>
           <el-container class="aside-box">
             <el-row>
-              <div class="mark-text">A:</div>
+              <div class="mark-text">From:</div>
               <el-select
                 v-model="node1Id"
                 filterable
@@ -188,7 +188,7 @@
                 >
                 </el-option>
               </el-select>
-              <div class="mark-text">B:</div>
+              <div class="mark-text">To:</div>
               <el-select
                 v-model="node2Id"
                 filterable
@@ -204,54 +204,126 @@
                 >
                 </el-option>
               </el-select>
+              <div class="mark-text">Pass:</div>
+              <el-select
+                v-model="node3Id"
+                filterable
+                placeholder="实体3"
+                @change="selectNode3"
+                class="select-box"
+              >
+                <el-option
+                  v-for="item in options"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+              <div class="mark-text">跳1:</div>
+              <el-select
+                v-model="jumpFrom"
+                filterable
+                placeholder="跳"
+                @change="selectJumpFrom"
+                class="select-box"
+              >
+                <el-option
+                  v-for="item in jumpOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+              <div class="mark-text">跳2:</div>
+              <el-select
+                v-model="jumpTo"
+                filterable
+                placeholder="跳2"
+                @change="selectJumpTo"
+                class="select-box"
+              >
+                <el-option
+                  v-for="item in jumpOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+              <div class="mark-text">Limit:</div>
+              <el-select
+                v-model="limit"
+                filterable
+                placeholder="限制条数"
+                @change="selectLimit"
+                class="select-box"
+              >
+                <el-option
+                  v-for="item in limitOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
             </el-row>
           </el-container>
           <el-container class="aside-box">
-            <el-row>
-              <el-button
-                class="select-button"
-                type="success"
-                @click="queryAtoB"
-                :disabled="!queryMode"
-                >寻找节点A和节点B之间的所有路径</el-button
-              >
-              <el-button
-                class="select-button"
-                type="success"
-                @click="queryAtoBNoCircle"
-                :disabled="!queryMode"
-                >寻找节点A和节点B之间的(x, y]跳之间的路径</el-button
-              >
-              <el-button
-                class="select-button"
-                type="success"
-                @click="queryAtoBNoCircle"
-                :disabled="!queryMode"
-                >寻找节点A和节点B之间在10跳以内的最短路径</el-button
-              >
-              <el-button
-                class="select-button"
-                type="success"
-                @click="queryAtoBNoCircle"
-                :disabled="!queryMode"
-                >寻找节点A和节点B之间在10跳以内的最长路径</el-button
-              >
-              <el-button
-                class="select-button"
-                type="success"
-                @click="queryAtoBNoCircle"
-                :disabled="!queryMode"
-                >寻找节点A和节点B,必经过节点C的一条路径</el-button
-              >
-
-              <el-button
-                class="select-button"
-                type="success"
-                @click="queryAtoBNoCircle"
-                :disabled="!queryMode"
-                >查看实体1到实体2之间的无环路</el-button
-              >
-            </el-row>
+            <el-scrollbar height="350px">
+              <el-row>
+                <el-button
+                  class="select-button"
+                  type="success"
+                  @click="queryAtoB"
+                  :disabled="!queryMode"
+                  >实体A和实体B之间在l-r跳以内的n条路径</el-button
+                >
+                <el-button
+                  class="select-button"
+                  type="success"
+                  @click="queryAtoBNoCircle"
+                  :disabled="!queryMode"
+                  >实体A和实体B之间在l-r跳以内的n条无环路径</el-button
+                >
+                <el-button
+                  class="select-button"
+                  type="success"
+                  @click="queryAtoBShortest"
+                  :disabled="!queryMode"
+                  >实体A和实体B之间在l-r跳以内的最短路径</el-button
+                >
+                <el-button
+                  class="select-button"
+                  type="success"
+                  @click="queryAtoBLongest"
+                  :disabled="!queryMode"
+                  >实体A和实体B之间在l-r跳以内的最长路径</el-button
+                >
+                <el-button
+                  class="select-button"
+                  type="success"
+                  @click="queryAtoBPassC"
+                  :disabled="!queryMode"
+                  >实体A和实体B之间经过实体C在l-r跳以内的n条路径</el-button
+                >
+                <el-button
+                  class="select-button"
+                  type="success"
+                  @click="queryMaxWeightPath"
+                  :disabled="!queryMode"
+                  >实体A和实体B之间在l-r跳以内权重最大的1条路径</el-button
+                >
+                <el-input
+                  class="select-button"
+                  v-model="inputSQLStatements"
+                  placeholder="输入任意sql语句"
+                  @change="queryInputSQL"
+                  :disabled="!queryMode"
+                />
+              </el-row>
+            </el-scrollbar>
           </el-container>
           <el-container class="aside-box">
             <el-button
@@ -305,8 +377,10 @@ export default {
       option: {}, // echart图的配置项参数
       node1: {},
       node2: {},
+      node3: {},
       node1Id: ref(""),
       node2Id: ref(""),
+      node3Id: ref(""),
       relTypeNow: ref(""),
       relValueNow: ref(""),
       insNameNow: ref(""),
@@ -413,6 +487,12 @@ export default {
         "Message-Topic": "#004d61",
       },
       loading: false,
+      inputSQLStatements: ref(""),
+      jumpOptions: [],
+      limitOptions: [],
+      jumpFrom: 0,
+      jumpTo: 0,
+      limit: 1,
     };
   },
   mounted() {
@@ -440,6 +520,23 @@ export default {
         };
         this.options.push(option);
       }
+
+      // 填写跳和limit的下拉框依赖数据
+      for (var i = 0; i <= 20; i++) {
+        var op = {
+          value: i,
+          label: i,
+        };
+        this.jumpOptions.push(op);
+      }
+      for (i = 1; i <= 200; i++) {
+        op = {
+          value: i,
+          label: i,
+        };
+        this.limitOptions.push(op);
+      }
+
       this.options.sort(function (a, b) {
         return ("" + a.label).localeCompare(b.label);
       });
@@ -823,6 +920,7 @@ export default {
         })
         .then((response) => {
           this.loading = false;
+
           this.responseData = response.data.results[0].data;
           this.queryDataHelper();
         })
@@ -834,28 +932,107 @@ export default {
           });
         });
     },
-    queryAtoBNoCircle() {
+    queryAtoB() {
+      let lr = "*" + this.jumpFrom + ".." + this.jumpTo;
       let statements = [
         {
           statement:
-            "match (from{name:'S'}),(to{name:'Cu'}) MATCH path = (from)-[*..10]->(to) WHERE SIZE(apoc.coll.toSet(NODES(path))) = LENGTH(path) + 1 RETURN path limit 10",
+            "match (from{name:$name1}),(to{name:$name2}), p=(from)-[" +
+            lr +
+            "]->(to) return p LIMIT $lim",
           parameters: {
             name1: this.node1.name,
             name2: this.node2.name,
+            lim: this.limit,
+          },
+        },
+      ];
+      console.log(
+        this.node1.name,
+        this.node2.name,
+        this.jumpFrom,
+        this.jumpTo,
+        this.limit
+      );
+      this.queryRequest(statements);
+    },
+    queryAtoBNoCircle() {
+      let lr = "*" + this.jumpFrom + ".." + this.jumpTo;
+      let statements = [
+        {
+          statement:
+            "match (from{name:$name1}),(to{name:$name2}) MATCH path = (from)-[" +
+            lr +
+            "]->(to) WHERE SIZE(apoc.coll.toSet(NODES(path))) = LENGTH(path) + 1 RETURN path limit $lim",
+          parameters: {
+            name1: this.node1.name,
+            name2: this.node2.name,
+            lim: this.limit,
           },
         },
       ];
       this.queryRequest(statements);
     },
-    queryAtoB() {
+    queryAtoBShortest() {
+      let lr = "*" + this.jumpFrom + ".." + this.jumpTo;
       let statements = [
         {
           statement:
-            "match (from{name:$name1}),(to{name:$name2}) match p=(from)-[*..10]->(to) return p LIMIT 10",
+            "Match (from{name:$name1}),(to{name:$name2}), p = shortestpath((from)-[" +
+            lr +
+            "]->(to)) return p",
           parameters: {
             name1: this.node1.name,
             name2: this.node2.name,
+            lim: this.limit,
           },
+        },
+      ];
+      this.queryRequest(statements);
+    },
+    queryAtoBLongest() {
+      let lr = "*" + this.jumpFrom + ".." + this.jumpTo;
+      let statements = [
+        {
+          statement:
+            "Match (from{name:$name1}),(to{name:$name2}), p = (from)-[" +
+            lr +
+            "]->(to) return Max(p)",
+          parameters: {
+            name1: this.node1.name,
+            name2: this.node2.name,
+            lim: this.limit,
+          },
+        },
+      ];
+      this.queryRequest(statements);
+    },
+    queryAtoBPassC() {
+      let lr = "*" + this.jumpFrom + ".." + this.jumpTo;
+      let statements = [
+        {
+          statement:
+            "Match (from{name:$name1}),(to{name:$name2}),(pass{name:$name3}),p = (from)-[" +
+            lr +
+            "]->(pass)-[" +
+            lr +
+            "]->(to) return p limit $lim",
+          parameters: {
+            name1: this.node1.name,
+            name2: this.node2.name,
+            name3: this.node3.name,
+            lim: this.limit,
+          },
+        },
+      ];
+      this.queryRequest(statements);
+    },
+    queryMaxWeightPath() {},
+    queryInputSQL() {
+      let statements = [
+        {
+          statement: this.inputSQLStatements,
+          parameters: {},
         },
       ];
       this.queryRequest(statements);
@@ -971,6 +1148,24 @@ export default {
           break;
         }
       }
+    },
+    selectNode3(v) {
+      this.node3Id = v;
+      for (var i = 0; i < this.options.length; i++) {
+        if (this.options[i].value == this.node3Id) {
+          this.node3.name = this.options[i].label;
+          break;
+        }
+      }
+    },
+    selectJumpFrom(v) {
+      console.log(v);
+    },
+    selectJumpTo(v) {
+      console.log(v);
+    },
+    selectLimit(v) {
+      console.log(v);
     },
     changeIns() {
       for (let i = 0; i < this.nodes.length; i++) {
@@ -1240,6 +1435,8 @@ html {
   text-align: center;
   line-height: 40px;
   margin: 0px 0px 0px 5px;
+  color: #303133;
+  font-size: 14px;
 }
 
 body {
