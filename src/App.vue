@@ -6,6 +6,7 @@
         <el-aside width="400px">
           <el-container class="aside-box">
             <el-row>
+              <!-- :style="'background:' + item.color" -->
               <el-check-tag
                 class="relTypeButton"
                 size="mini"
@@ -170,13 +171,87 @@
             </el-row>
           </el-container>
           <el-container class="aside-box">
-            <el-button
-              class="select-button"
-              type="success"
-              @click="queryRequest"
-              :disabled="!queryMode"
-              >查看从V到Cu3跳以内的3个路径</el-button
-            >
+            <el-row>
+              <div class="mark-text">A:</div>
+              <el-select
+                v-model="node1Id"
+                filterable
+                placeholder="实体1"
+                @change="selectNode1"
+                class="select-box"
+              >
+                <el-option
+                  v-for="item in options"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+              <div class="mark-text">B:</div>
+              <el-select
+                v-model="node2Id"
+                filterable
+                placeholder="实体2"
+                @change="selectNode2"
+                class="select-box"
+              >
+                <el-option
+                  v-for="item in options"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+            </el-row>
+          </el-container>
+          <el-container class="aside-box">
+            <el-row>
+              <el-button
+                class="select-button"
+                type="success"
+                @click="queryAtoB"
+                :disabled="!queryMode"
+                >寻找节点A和节点B之间的所有路径</el-button
+              >
+              <el-button
+                class="select-button"
+                type="success"
+                @click="queryAtoBNoCircle"
+                :disabled="!queryMode"
+                >寻找节点A和节点B之间的(x, y]跳之间的路径</el-button
+              >
+              <el-button
+                class="select-button"
+                type="success"
+                @click="queryAtoBNoCircle"
+                :disabled="!queryMode"
+                >寻找节点A和节点B之间在10跳以内的最短路径</el-button
+              >
+              <el-button
+                class="select-button"
+                type="success"
+                @click="queryAtoBNoCircle"
+                :disabled="!queryMode"
+                >寻找节点A和节点B之间在10跳以内的最长路径</el-button
+              >
+              <el-button
+                class="select-button"
+                type="success"
+                @click="queryAtoBNoCircle"
+                :disabled="!queryMode"
+                >寻找节点A和节点B,必经过节点C的一条路径</el-button
+              >
+
+              <el-button
+                class="select-button"
+                type="success"
+                @click="queryAtoBNoCircle"
+                :disabled="!queryMode"
+                >查看实体1到实体2之间的无环路</el-button
+              >
+            </el-row>
           </el-container>
           <el-container class="aside-box">
             <el-button
@@ -197,7 +272,12 @@
           </el-container>
         </el-aside>
         <el-main>
-          <div id="main"></div>
+          <div
+            id="main"
+            v-loading="loading"
+            element-loading-text="数据库搜索中"
+            element-loading-background="rgba(0, 0, 0, 0.8)"
+          ></div>
         </el-main>
       </el-container>
     </el-container>
@@ -236,6 +316,7 @@ export default {
       nodeSwitch: 1,
       autoSave: true,
       relValues: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      modeStatusMemory: {}, // 用来记录进入推理模式之前的状态
       relIdMap: [
         "Cause-Effect",
         "Instrument-Agency",
@@ -259,67 +340,62 @@ export default {
         "DEEP",
         "ELEM",
       ],
-      insSizeFilter: [4, 78], // 1-373训练 1-2080测试
+      insSizeFilter: [8, 200], // 1-373训练 1-2080测试
       relSizeFilter: [1, 12], // 1-10训练 1-277测试
-      insSizeTable: [
-        5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90,
-        95, 100, 105, 110,
-      ],
-      relSizeTable: [],
       maxSize: 400,
       maxWidth: 10,
       relTypes: [
         {
           name: "Cause-Effect",
-          color: "#626aef",
+          color: "#fdc4b6",
           use: false,
           id: 0,
         },
         {
           name: "Instrument-Agency",
-          color: "#626aef",
+          color: "#ea7070",
           use: false,
           id: 1,
         },
         {
           name: "Message-Topic",
-          color: "#626aef",
+          color: "#004d61",
           use: false,
           id: 2,
         },
         {
           name: "Product-Producer",
-          color: "#626aef",
+          color: "#e59572",
           use: false,
           id: 3,
         },
         {
           name: "Member-Collection",
-          color: "#626aef",
+          color: "#a696c8",
           use: true,
           id: 4,
         },
         {
           name: "Entity-Origin",
-          color: "#626aef",
+          color: "#a8dba8",
           use: false,
           id: 5,
         },
         {
           name: "Entity-Destination",
-          color: "#626aef",
+          color: "#f6d04d",
           use: true,
           id: 6,
         },
         {
           name: "Component-Whole",
-          color: "#626aef",
+          color: "#66cdaa",
           use: false,
           id: 7,
         },
         {
           name: "Content-Container",
-          color: "#626aef",
+          color: "#2694ab",
           use: true,
           id: 8,
         },
@@ -332,10 +408,11 @@ export default {
         "Content-Container": "#2694ab",
         "Entity-Origin": "#a8dba8",
         "Entity-Destination": "#f6d04d",
-        "Component-Whole": "#d0d9e0",
+        "Component-Whole": "#66cdaa",
         "Member-Collection": "#a696c8",
         "Message-Topic": "#004d61",
       },
+      loading: false,
     };
   },
   mounted() {
@@ -350,7 +427,7 @@ export default {
       this.graph = graph;
       this.nodes = graph.nodes;
       this.links = graph.links;
-
+      this.history = graph.history;
       // 保存节点的最大size和边的最大width，在过滤器中使用
       // this.maxSize = graph.maxSize;
       // this.maxWidth = graph.maxWidth;
@@ -399,7 +476,7 @@ export default {
             selectedMode: true,
             draggable: true,
             edgeSymbol: ["circle", "arrow"], // 设置箭头
-            edgeSymbolSize: [1, 10], // 设置箭头的大小
+            edgeSymbolSize: [1, 8], // 设置箭头的大小
             name: "实体与关系",
             type: "graph",
             layout: "force",
@@ -580,6 +657,7 @@ export default {
           username: "neo4j",
           password: "159753zzz",
         },
+        timeout: 5000,
         method: "post",
       });
       this.ax = req;
@@ -680,7 +758,13 @@ export default {
     queryDataHelper() {
       var queryNodes = new Map();
       var queryLinks = new Map();
-      console.log(this.responseData)
+      if (this.responseData.length == 0) {
+        this.$message({
+          message: "没有查询到结果",
+          type: "error",
+        });
+      }
+      console.log(this.responseData);
       for (let path of this.responseData) {
         const entitys = path.row[0];
         for (let entity of entitys) {
@@ -699,7 +783,6 @@ export default {
         }
       }
 
-
       // 清空列表数据
       this.filtedLinks.splice(0);
       this.filtedNodes.splice(0);
@@ -717,8 +800,8 @@ export default {
         let link = key[1];
         link.value = link.relation;
         link.lineStyle = {
-          color: link.color,
-          width: link.width*2,
+          color: this.rel_color_map[link.value],
+          width: link.width * 2,
         };
         link.label = {
           formatter: "{c}",
@@ -732,24 +815,50 @@ export default {
       let main = echarts.init(document.getElementById("main"), "dark"); // 不懂这样为社么更快，但是确实更快
       main.setOption(this.option);
     },
-    queryRequest() {
+    queryRequest(statements) {
+      this.loading = true;
       this.ax
-        .post("http://192.168.103.246:7474/db/neo4j/tx", {
-          statements: [
-            {
-              statement:
-                "match (from{name:$name1}),(to{name:$name2}) match p=(from)-[*..10]->(to) return p LIMIT 5",
-                parameters:{
-                  name1: this.node1.name,
-                  name2: this.node2.name
-                }
-            },
-          ],
+        .post("http://192.168.103.246:7474/db/neo4j/tx/commit", {
+          statements: statements,
         })
         .then((response) => {
+          this.loading = false;
           this.responseData = response.data.results[0].data;
           this.queryDataHelper();
+        })
+        .catch((reason) => {
+          this.loading = false;
+          this.$message({
+            message: "出错了 " + reason,
+            type: "error",
+          });
         });
+    },
+    queryAtoBNoCircle() {
+      let statements = [
+        {
+          statement:
+            "match (from{name:'S'}),(to{name:'Cu'}) MATCH path = (from)-[*..10]->(to) WHERE SIZE(apoc.coll.toSet(NODES(path))) = LENGTH(path) + 1 RETURN path limit 10",
+          parameters: {
+            name1: this.node1.name,
+            name2: this.node2.name,
+          },
+        },
+      ];
+      this.queryRequest(statements);
+    },
+    queryAtoB() {
+      let statements = [
+        {
+          statement:
+            "match (from{name:$name1}),(to{name:$name2}) match p=(from)-[*..10]->(to) return p LIMIT 10",
+          parameters: {
+            name1: this.node1.name,
+            name2: this.node2.name,
+          },
+        },
+      ];
+      this.queryRequest(statements);
     },
     onChange(id) {
       if (this.relTypes[id].use == true) {
@@ -938,19 +1047,34 @@ export default {
     holdModeChange(value) {
       this.queryMode = value;
       if (value == true) {
+        // 如果进入推理模式
+        // 首先存储之前的模式
+        let status = {
+          relStatus: [],
+          insFilterStatus: this.insSizeFilter,
+          relFilterStatus: this.relSizeFilter,
+          fixNodes: this.fixNodes,
+        };
         for (let foo of this.relTypes) {
-          foo.use = true
+          status.relStatus.push(foo.use);
+          foo.use = true;
         }
-        this.insSizeFilter = [0, this.maxSize]
-        this.relSizeFilter = [0, this.maxWidth]
+        this.modeStatusMemory = status;
+
+        // 修改参数状态
+        this.fixNodes = false;
+        this.insSizeFilter = [0, this.maxSize];
+        this.relSizeFilter = [0, this.maxWidth];
         this.filtedLinks.splice(0);
         this.filtedNodes.splice(0);
       } else {
-        for (let foo of this.relTypes) {
-          foo.use = false
+        //进行状态的恢复
+        for (let key in this.relTypes) {
+          this.relTypes[key].use = this.modeStatusMemory.relStatus[key];
         }
-        this.insSizeFilter = [4, 100]
-        this.relSizeFilter = [0, 5]
+        this.insSizeFilter = this.modeStatusMemory.insFilterStatus;
+        this.relSizeFilter = this.modeStatusMemory.relFilterStatus;
+        this.fixNodes = this.modeStatusMemory.fixNodes;
       }
       this.updateGraph();
     },
@@ -1048,7 +1172,7 @@ html {
   line-height: 20px;
 }
 .slider-box {
-  padding: 10px 50px;
+  padding: 0px 40px;
 }
 .el-header,
 .el-footer {
@@ -1078,12 +1202,13 @@ html {
 }
 
 .aside-box {
-  padding: 10px 15px 10px 15px;
+  padding: 10px 15px 5px 15px;
 }
 
 .relTypeButton {
   margin-left: 5px !important;
   margin-bottom: 5px !important;
+  color: #2c3e50;
 }
 
 .select-box {
@@ -1108,6 +1233,13 @@ html {
 .select-button {
   margin-left: 5px !important;
   margin-bottom: 5px !important;
+}
+
+.mark-text {
+  height: 40px;
+  text-align: center;
+  line-height: 40px;
+  margin: 0px 0px 0px 5px;
 }
 
 body {
