@@ -172,7 +172,7 @@
           </el-container>
           <el-container class="aside-box">
             <el-row>
-              <div class="mark-text">From:</div>
+              <div class="mark-text">节点 A:</div>
               <el-select
                 v-model="node1Id"
                 filterable
@@ -188,7 +188,7 @@
                 >
                 </el-option>
               </el-select>
-              <div class="mark-text">To:</div>
+              <div class="mark-text">B:</div>
               <el-select
                 v-model="node2Id"
                 filterable
@@ -204,7 +204,7 @@
                 >
                 </el-option>
               </el-select>
-              <div class="mark-text">Pass:</div>
+              <div class="mark-text">节点 C:</div>
               <el-select
                 v-model="node3Id"
                 filterable
@@ -220,39 +220,7 @@
                 >
                 </el-option>
               </el-select>
-              <div class="mark-text">跳1:</div>
-              <el-select
-                v-model="jumpFrom"
-                filterable
-                placeholder="跳"
-                @change="selectJumpFrom"
-                class="select-box"
-              >
-                <el-option
-                  v-for="item in jumpOptions"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                >
-                </el-option>
-              </el-select>
-              <div class="mark-text">跳2:</div>
-              <el-select
-                v-model="jumpTo"
-                filterable
-                placeholder="跳2"
-                @change="selectJumpTo"
-                class="select-box"
-              >
-                <el-option
-                  v-for="item in jumpOptions"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                >
-                </el-option>
-              </el-select>
-              <div class="mark-text">Limit:</div>
+              <div class="mark-text">N:</div>
               <el-select
                 v-model="limit"
                 filterable
@@ -268,10 +236,42 @@
                 >
                 </el-option>
               </el-select>
+              <div class="mark-text">区间 L:</div>
+              <el-select
+                v-model="jumpFrom"
+                filterable
+                placeholder="跳"
+                @change="selectJumpFrom"
+                class="select-box"
+              >
+                <el-option
+                  v-for="item in jumpOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
+              <div class="mark-text">R:</div>
+              <el-select
+                v-model="jumpTo"
+                filterable
+                placeholder="跳2"
+                @change="selectJumpTo"
+                class="select-box"
+              >
+                <el-option
+                  v-for="item in jumpOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                >
+                </el-option>
+              </el-select>
             </el-row>
           </el-container>
           <el-container class="aside-box">
-            <el-scrollbar height="350px">
+            <el-scrollbar height="270px">
               <el-row>
                 <el-button
                   class="select-button"
@@ -292,7 +292,7 @@
                   type="success"
                   @click="queryAtoBShortest"
                   :disabled="!queryMode"
-                  >实体A和实体B之间在l-r跳以内的最短路径</el-button
+                  >实体A和实体B之间在1-r跳以内的最短路径</el-button
                 >
                 <el-button
                   class="select-button"
@@ -493,6 +493,7 @@ export default {
       jumpFrom: 0,
       jumpTo: 0,
       limit: 1,
+      highlightNameList: [],
     };
   },
   mounted() {
@@ -579,9 +580,9 @@ export default {
             layout: "force",
             force: {
               //力导布局参数
-              repulsion: 200,
+              repulsion: 500,
               gravity: 0.1,
-              edgeLength: [150, 300],
+              edgeLength: 300,
             },
             data: this.filtedNodes, // 实际用到的数据是过滤后的节点
             links: this.filtedLinks, // 过滤后的关系
@@ -614,6 +615,22 @@ export default {
       main.setOption(this.option);
       // 配置相应函数
       var _this = this; // 让响应函数也能访问到vue
+      // main.on("dblclick", { dataType: "node" }, function (data) {
+      //   console.log(data);
+      //   _this.highlightNameList.push(data.dataIndex);
+      //   _this.chart.dispatchAction({
+      //     type: "highlight",
+      //     dataIndex: _this.highlightNameList,
+      //   });
+      // });
+      // main.on("dblclick", { dataType: "edge" }, function (data) {
+      //   console.log(data);
+      //   _this.highlightNameList.push(data.dataIndex);
+      //   _this.chart.dispatchAction({
+      //     type: "highlight",
+      //     dataIndex: _this.highlightNameList,
+      //   });
+      // });
       main.on("click", { dataType: "node" }, function (data) {
         if (_this.queryMode) {
           return; // 如果是查询模式直接返回
@@ -630,117 +647,117 @@ export default {
         _this.insValueNow = data.data.value;
         _this.insNameNow = data.data.name;
       });
-      main.on("dblclick", { dataType: "node" }, function (data) {
-        if (_this.queryMode) {
-          return; // 如果是查询模式直接返回
-        }
-        console.log(data);
+      // main.on("dblclick", { dataType: "node" }, function (data) {
+      //   if (_this.queryMode) {
+      //     return; // 如果是查询模式直接返回
+      //   }
+      //   console.log(data);
 
-        // 删除节点
-        for (let i = 0; i < _this.nodes.length; i++) {
-          if (_this.nodes[i].id == data.data.id) {
-            _this.nodes.splice(i, 1);
-            break;
-          }
-        }
+      //   // 删除节点
+      //   for (let i = 0; i < _this.nodes.length; i++) {
+      //     if (_this.nodes[i].id == data.data.id) {
+      //       _this.nodes.splice(i, 1);
+      //       break;
+      //     }
+      //   }
 
-        // 删除与之相连的关系
-        for (let i = 0; i < _this.links.length; i++) {
-          if (
-            _this.links[i].source == data.data.id ||
-            _this.links[i].target == data.data.id
-          ) {
-            _this.links.splice(i, 1);
-          }
-        }
+      //   // 删除与之相连的关系
+      //   for (let i = 0; i < _this.links.length; i++) {
+      //     if (
+      //       _this.links[i].source == data.data.id ||
+      //       _this.links[i].target == data.data.id
+      //     ) {
+      //       _this.links.splice(i, 1);
+      //     }
+      //   }
 
-        // 删除option选项
-        for (let i = 0; i < _this.options.length; i++) {
-          if (_this.options[i].value == data.data.id) {
-            _this.options.splice(i, 1);
-            break;
-          }
-        }
-        _this.node1Id = null;
-        _this.node1.name = null;
-        _this.node2Id = null;
-        _this.node2.name = null;
+      //   // 删除option选项
+      //   for (let i = 0; i < _this.options.length; i++) {
+      //     if (_this.options[i].value == data.data.id) {
+      //       _this.options.splice(i, 1);
+      //       break;
+      //     }
+      //   }
+      //   _this.node1Id = null;
+      //   _this.node1.name = null;
+      //   _this.node2Id = null;
+      //   _this.node2.name = null;
 
-        // 保存历史记录
-        let his = {
-          type: "delIns",
-          name: data.data.name,
-          category: data.data.category,
-          symbolSize: data.data.symbolSize,
-          id: data.data.id,
-          value: data.data.value,
-        };
-        _this.history.push(his);
-        // 这里会接连调用dbclick边，不知道是bug还是细节
-        _this.updateGraph();
-      });
+      //   // 保存历史记录
+      //   let his = {
+      //     type: "delIns",
+      //     name: data.data.name,
+      //     category: data.data.category,
+      //     symbolSize: data.data.symbolSize,
+      //     id: data.data.id,
+      //     value: data.data.value,
+      //   };
+      //   _this.history.push(his);
+      //   // 这里会接连调用dbclick边，不知道是bug还是细节
+      //   _this.updateGraph();
+      // });
       main.on("mouseup", { dataType: "node" }, function () {
         _this.updateGraph();
       });
-      main.on("dblclick", { dataType: "edge" }, function (data) {
-        if (_this.queryMode) {
-          return; // 如果是查询模式直接返回
-        }
-        console.log("deleteRel", data);
-        for (var i = 0; i < _this.links.length; i++) {
-          if (data.dataType == "node") {
-            console.log("发生传递");
-            break;
-          }
-          if (data.data.source == _this.links[i].source) {
-            if (data.data.target == _this.links[i].target) {
-              if (data.data.value == _this.links[i].value) {
-                let a = null;
-                let b = null;
-                for (var j = 0; j < _this.options.length; j++) {
-                  if (_this.options[j].value == _this.links[i].source) {
-                    a = _this.options[j].label;
-                  }
-                  if (_this.options[j].value == _this.links[i].target) {
-                    b = _this.options[j].label;
-                  }
-                  if (a && b) {
-                    break;
-                  }
-                }
-                var ct = 0;
-                for (j = 0; j < _this.nodes.length; j++) {
-                  if (
-                    _this.nodes[j].id == _this.links[i].source ||
-                    _this.nodes[j].id == _this.links[i].target
-                  ) {
-                    console.log(_this.links[i].source, _this.links[i].target);
-                    _this.nodes[j].symbolSize -= _this.links[i].lineStyle.width;
-                    console.log(_this.nodes[j]);
-                    ct += 1;
-                  }
-                  if (ct == 2) {
-                    break;
-                  }
-                }
-                let his = {
-                  type: "delRel",
-                  node1Name: a,
-                  node2Name: b,
-                  relType: _this.links[i].value,
-                };
-                _this.links.splice(i, 1);
-                _this.history.push(his);
-                break;
-              }
-            }
-          }
-        }
-        if (_this.autoSave) {
-          _this.saveData();
-        }
-        _this.updateGraph();
-      });
+      // main.on("dblclick", { dataType: "edge" }, function (data) {
+      //   if (_this.queryMode) {
+      //     return; // 如果是查询模式直接返回
+      //   }
+      //   console.log("deleteRel", data);
+      //   for (var i = 0; i < _this.links.length; i++) {
+      //     if (data.dataType == "node") {
+      //       console.log("发生传递");
+      //       break;
+      //     }
+      //     if (data.data.source == _this.links[i].source) {
+      //       if (data.data.target == _this.links[i].target) {
+      //         if (data.data.value == _this.links[i].value) {
+      //           let a = null;
+      //           let b = null;
+      //           for (var j = 0; j < _this.options.length; j++) {
+      //             if (_this.options[j].value == _this.links[i].source) {
+      //               a = _this.options[j].label;
+      //             }
+      //             if (_this.options[j].value == _this.links[i].target) {
+      //               b = _this.options[j].label;
+      //             }
+      //             if (a && b) {
+      //               break;
+      //             }
+      //           }
+      //           var ct = 0;
+      //           for (j = 0; j < _this.nodes.length; j++) {
+      //             if (
+      //               _this.nodes[j].id == _this.links[i].source ||
+      //               _this.nodes[j].id == _this.links[i].target
+      //             ) {
+      //               console.log(_this.links[i].source, _this.links[i].target);
+      //               _this.nodes[j].symbolSize -= _this.links[i].lineStyle.width;
+      //               console.log(_this.nodes[j]);
+      //               ct += 1;
+      //             }
+      //             if (ct == 2) {
+      //               break;
+      //             }
+      //           }
+      //           let his = {
+      //             type: "delRel",
+      //             node1Name: a,
+      //             node2Name: b,
+      //             relType: _this.links[i].value,
+      //           };
+      //           _this.links.splice(i, 1);
+      //           _this.history.push(his);
+      //           break;
+      //         }
+      //       }
+      //     }
+      //   }
+      //   if (_this.autoSave) {
+      //     _this.saveData();
+      //   }
+      //   _this.updateGraph();
+      // });
     },
     initAxios() {
       const req = this.axios.create({
@@ -852,7 +869,7 @@ export default {
         }
       }
     },
-    queryDataHelper() {
+    queryDataHelper(filter) {
       var queryNodes = new Map();
       var queryLinks = new Map();
       if (this.responseData.length == 0) {
@@ -862,6 +879,33 @@ export default {
         });
       }
       console.log(this.responseData);
+
+      if (filter == "weight") {
+        let maxIndex = 0;
+        let max = 0;
+        for (let key in this.responseData) {
+          let path = this.responseData[key]
+          const entitys = path.row[0];
+          let sum = 0;
+          let count = 0;
+          for (let entity of entitys) {  // 计算权重
+            if (entity.id == null) {
+              count += 1;
+              sum += Number(entity.width)
+            }
+          }
+          let value = sum / count;
+          console.log(value)
+          if (value > max) {  // 如果更大则记录
+            max = value;
+            maxIndex = key;
+          }
+        }
+        let foo = this.responseData[maxIndex]
+        this.responseData.splice(0)
+        this.responseData.push(foo)
+      }
+
       for (let path of this.responseData) {
         const entitys = path.row[0];
         for (let entity of entitys) {
@@ -912,7 +956,7 @@ export default {
       let main = echarts.init(document.getElementById("main"), "dark"); // 不懂这样为社么更快，但是确实更快
       main.setOption(this.option);
     },
-    queryRequest(statements) {
+    queryRequest(statements, filter) {
       this.loading = true;
       this.ax
         .post("http://192.168.103.246:7474/db/neo4j/tx/commit", {
@@ -920,9 +964,8 @@ export default {
         })
         .then((response) => {
           this.loading = false;
-
           this.responseData = response.data.results[0].data;
-          this.queryDataHelper();
+          this.queryDataHelper(filter);
         })
         .catch((reason) => {
           this.loading = false;
@@ -980,7 +1023,7 @@ export default {
           statement:
             "Match (from{name:$name1}),(to{name:$name2}), p = shortestpath((from)-[" +
             lr +
-            "]->(to)) return p",
+            "]->(to)) return p limit $lim",
           parameters: {
             name1: this.node1.name,
             name2: this.node2.name,
@@ -1027,7 +1070,23 @@ export default {
       ];
       this.queryRequest(statements);
     },
-    queryMaxWeightPath() {},
+    queryMaxWeightPath() {
+      let lr = "*" + this.jumpFrom + ".." + this.jumpTo;
+      let statements = [
+        {
+          statement:
+            "match (from{name:$name1}),(to{name:$name2}), p=(from)-[" +
+            lr +
+            "]->(to) return p LIMIT $lim",
+          parameters: {
+            name1: this.node1.name,
+            name2: this.node2.name,
+            lim: this.limit,
+          },
+        },
+      ];
+      this.queryRequest(statements, "weight");
+    },
     queryInputSQL() {
       let statements = [
         {
