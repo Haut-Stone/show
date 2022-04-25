@@ -1017,7 +1017,7 @@ export default {
       this.queryRequest(statements);
     },
     queryAtoBShortest() {
-      let lr = "*" + this.jumpFrom + ".." + this.jumpTo;
+      let lr = "*1.." + this.jumpTo;
       let statements = [
         {
           statement:
