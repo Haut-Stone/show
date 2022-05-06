@@ -504,14 +504,15 @@ export default {
   methods: {
     initData() {
       // 获取完整的图文件
-      var graph = require("./datas/2022-1-4-17-29-55.json");
+      var graph = require("./datas/echart_use_data_predict_last_with_his.json");
       this.graph = graph;
       this.nodes = graph.nodes;
       this.links = graph.links;
       this.history = graph.history;
+
       // 保存节点的最大size和边的最大width，在过滤器中使用
-      // this.maxSize = graph.maxSize;
-      // this.maxWidth = graph.maxWidth;
+      this.maxSize = graph.maxSize;
+      this.maxWidth = graph.maxWidth;
 
       // 创建实体下拉选择框依赖的数据
       for (var node of this.nodes) {
@@ -541,6 +542,20 @@ export default {
       this.options.sort(function (a, b) {
         return ("" + a.label).localeCompare(b.label);
       });
+      this.AutoMerge()
+    },
+    AutoMerge() {
+      console.log(自动合并开始)
+
+
+
+
+
+
+
+
+      
+      console.log(自动合并结束)
     },
     initGraph() {
       let main = echarts.init(document.getElementById("main"), "dark");
@@ -771,7 +786,7 @@ export default {
           username: "neo4j",
           password: "159753zzz",
         },
-        timeout: 5000,
+        timeout: 8000,
         method: "post",
       });
       this.ax = req;
@@ -959,7 +974,7 @@ export default {
     queryRequest(statements, filter) {
       this.loading = true;
       this.ax
-        .post("http://192.168.103.246:7474/db/neo4j/tx/commit", {
+        .post("http://39.105.230.175:7474/db/neo4j/tx/commit", {
           statements: statements,
         })
         .then((response) => {
@@ -1028,7 +1043,7 @@ export default {
             name1: this.node1.name,
             name2: this.node2.name,
             lim: this.limit,
-          },
+          }, 
         },
       ];
       this.queryRequest(statements);
