@@ -416,8 +416,8 @@ export default {
       ],
       insSizeFilter: [8, 200], // 1-373训练 1-2080测试
       relSizeFilter: [1, 12], // 1-10训练 1-277测试
-      maxSize: 400,
-      maxWidth: 10,
+      maxSize: 1122,
+      maxWidth: 28,
       relTypes: [
         {
           name: "Cause-Effect",
@@ -494,6 +494,7 @@ export default {
       jumpTo: 0,
       limit: 1,
       highlightNameList: [],
+      notNeedUpdate: false,
     };
   },
   mounted() {
@@ -504,15 +505,18 @@ export default {
   methods: {
     initData() {
       // 获取完整的图文件
-      var graph = require("./datas/echart_use_data_predict_last_with_his.json");
+      var graph = require("./datas/2022-5-6-23-14-29.json");
       this.graph = graph;
       this.nodes = graph.nodes;
       this.links = graph.links;
       this.history = graph.history;
 
       // 保存节点的最大size和边的最大width，在过滤器中使用
-      this.maxSize = graph.maxSize;
-      this.maxWidth = graph.maxWidth;
+      // this.maxSize = graph.maxSize;
+      // this.maxWidth = graph.maxWidth;
+
+      // 是否自动合并 important !!
+      // this.AutoMerge();
 
       // 创建实体下拉选择框依赖的数据
       for (var node of this.nodes) {
@@ -522,6 +526,9 @@ export default {
         };
         this.options.push(option);
       }
+      this.options.sort(function (a, b) {
+        return ("" + a.label).localeCompare(b.label);
+      });
 
       // 填写跳和limit的下拉框依赖数据
       for (var i = 0; i <= 20; i++) {
@@ -538,24 +545,98 @@ export default {
         };
         this.limitOptions.push(op);
       }
-
-      this.options.sort(function (a, b) {
-        return ("" + a.label).localeCompare(b.label);
-      });
-      this.AutoMerge()
     },
     AutoMerge() {
-      console.log(自动合并开始)
+      console.log("自动合并开始");
+      let cnt1 = 0;
+      for (let his of this.history) {
+        if (his.type == "merge") {
+          let node1Id = -1;
+          let node2Id = -1;
 
+          for (let i = 0; i < this.nodes.length; i++) {
+            if (this.nodes[i].name == his.node1Name) {
+              node1Id = this.nodes[i].id;
+              break;
+            }
+          }
 
+          for (let i = 0; i < this.nodes.length; i++) {
+            if (this.nodes[i].name == his.node2Name) {
+              node2Id = this.nodes[i].id;
+              break;
+            }
+          }
 
+          // 如果没有找到两个节点
+          if (node1Id == -1 || node2Id == -1) {
+            continue;
+          }
 
+          cnt1 += 1;
 
+          // 合并节点的关系，重复的关系线要变粗
+          var map1 = new Map();
+          for (let i = 0; i < this.links.length; i++) {
+            // 替换边实体
+            if (this.links[i].source == node1Id) {
+              this.links[i].source = node2Id;
+            } else if (this.links[i].target == node1Id) {
+              this.links[i].target = node2Id;
+            }
+            // 记录map
+            var label =
+              this.links[i].source +
+              "@@@" +
+              this.links[i].target +
+              "@@@" +
+              this.links[i].value;
+            if (map1.has(label)) {
+              map1.set(label, map1.get(label) + this.links[i].lineStyle.width);
+            } else {
+              map1.set(label, this.links[i].lineStyle.width);
+            }
+          }
+          this.links.splice(0);
+          for (let temp of map1) {
+            var a = temp[0].split("@@@");
+            let s = a[0];
+            let t = a[1];
+            let c = a[2];
+            let link = {
+              source: s,
+              target: t,
+              value: c,
+              lineStyle: {
+                color: this.rel_color_map[c],
+                width: temp[1],
+              },
+              label: {
+                formatter: "{c}",
+              },
+            };
+            this.links.push(link);
+          }
 
-
-
-      
-      console.log(自动合并结束)
+          // 删除节点,更新节点大小
+          var node1Size = 0;
+          for (let i = 0; i < this.nodes.length; i++) {
+            if (this.nodes[i].id == node1Id) {
+              node1Size = this.nodes[i].symbolSize;
+              this.nodes.splice(i, 1);
+              break;
+            }
+          }
+          for (let i = 0; i < this.nodes.length; i++) {
+            if (this.nodes[i].id == node2Id) {
+              this.nodes[i].symbolSize = this.nodes[i].symbolSize + node1Size;
+              break;
+            }
+          }
+        }
+      }
+      console.log("共和并边数：", cnt1);
+      console.log("自动合并结束");
     },
     initGraph() {
       let main = echarts.init(document.getElementById("main"), "dark");
@@ -630,22 +711,6 @@ export default {
       main.setOption(this.option);
       // 配置相应函数
       var _this = this; // 让响应函数也能访问到vue
-      // main.on("dblclick", { dataType: "node" }, function (data) {
-      //   console.log(data);
-      //   _this.highlightNameList.push(data.dataIndex);
-      //   _this.chart.dispatchAction({
-      //     type: "highlight",
-      //     dataIndex: _this.highlightNameList,
-      //   });
-      // });
-      // main.on("dblclick", { dataType: "edge" }, function (data) {
-      //   console.log(data);
-      //   _this.highlightNameList.push(data.dataIndex);
-      //   _this.chart.dispatchAction({
-      //     type: "highlight",
-      //     dataIndex: _this.highlightNameList,
-      //   });
-      // });
       main.on("click", { dataType: "node" }, function (data) {
         if (_this.queryMode) {
           return; // 如果是查询模式直接返回
@@ -662,117 +727,118 @@ export default {
         _this.insValueNow = data.data.value;
         _this.insNameNow = data.data.name;
       });
-      // main.on("dblclick", { dataType: "node" }, function (data) {
-      //   if (_this.queryMode) {
-      //     return; // 如果是查询模式直接返回
-      //   }
-      //   console.log(data);
+      main.on("dblclick", { dataType: "node" }, function (data) {
+        if (_this.queryMode) {
+          return; // 如果是查询模式直接返回
+        }
+        console.log(data);
 
-      //   // 删除节点
-      //   for (let i = 0; i < _this.nodes.length; i++) {
-      //     if (_this.nodes[i].id == data.data.id) {
-      //       _this.nodes.splice(i, 1);
-      //       break;
-      //     }
-      //   }
+        // 删除节点
+        for (let i = 0; i < _this.nodes.length; i++) {
+          if (_this.nodes[i].id == data.data.id) {
+            _this.nodes.splice(i, 1);
+            break;
+          }
+        }
 
-      //   // 删除与之相连的关系
-      //   for (let i = 0; i < _this.links.length; i++) {
-      //     if (
-      //       _this.links[i].source == data.data.id ||
-      //       _this.links[i].target == data.data.id
-      //     ) {
-      //       _this.links.splice(i, 1);
-      //     }
-      //   }
+        // 删除与之相连的关系
+        for (let i = 0; i < _this.links.length; i++) {
+          if (
+            _this.links[i].source == data.data.id ||
+            _this.links[i].target == data.data.id
+          ) {
+            _this.links.splice(i, 1);
+          }
+        }
 
-      //   // 删除option选项
-      //   for (let i = 0; i < _this.options.length; i++) {
-      //     if (_this.options[i].value == data.data.id) {
-      //       _this.options.splice(i, 1);
-      //       break;
-      //     }
-      //   }
-      //   _this.node1Id = null;
-      //   _this.node1.name = null;
-      //   _this.node2Id = null;
-      //   _this.node2.name = null;
+        // 删除option选项
+        for (let i = 0; i < _this.options.length; i++) {
+          if (_this.options[i].value == data.data.id) {
+            _this.options.splice(i, 1);
+            break;
+          }
+        }
+        _this.node1Id = null;
+        _this.node1.name = null;
+        _this.node2Id = null;
+        _this.node2.name = null;
 
-      //   // 保存历史记录
-      //   let his = {
-      //     type: "delIns",
-      //     name: data.data.name,
-      //     category: data.data.category,
-      //     symbolSize: data.data.symbolSize,
-      //     id: data.data.id,
-      //     value: data.data.value,
-      //   };
-      //   _this.history.push(his);
-      //   // 这里会接连调用dbclick边，不知道是bug还是细节
-      //   _this.updateGraph();
-      // });
-      main.on("mouseup", { dataType: "node" }, function () {
+        // 保存历史记录
+        let his = {
+          type: "delIns",
+          name: data.data.name,
+          category: data.data.category,
+          symbolSize: data.data.symbolSize,
+          id: data.data.id,
+          value: data.data.value,
+        };
+        _this.history.push(his);
+        // 这里会接连调用dbclick边，不知道是bug还是细节
         _this.updateGraph();
       });
-      // main.on("dblclick", { dataType: "edge" }, function (data) {
-      //   if (_this.queryMode) {
-      //     return; // 如果是查询模式直接返回
-      //   }
-      //   console.log("deleteRel", data);
-      //   for (var i = 0; i < _this.links.length; i++) {
-      //     if (data.dataType == "node") {
-      //       console.log("发生传递");
-      //       break;
-      //     }
-      //     if (data.data.source == _this.links[i].source) {
-      //       if (data.data.target == _this.links[i].target) {
-      //         if (data.data.value == _this.links[i].value) {
-      //           let a = null;
-      //           let b = null;
-      //           for (var j = 0; j < _this.options.length; j++) {
-      //             if (_this.options[j].value == _this.links[i].source) {
-      //               a = _this.options[j].label;
-      //             }
-      //             if (_this.options[j].value == _this.links[i].target) {
-      //               b = _this.options[j].label;
-      //             }
-      //             if (a && b) {
-      //               break;
-      //             }
-      //           }
-      //           var ct = 0;
-      //           for (j = 0; j < _this.nodes.length; j++) {
-      //             if (
-      //               _this.nodes[j].id == _this.links[i].source ||
-      //               _this.nodes[j].id == _this.links[i].target
-      //             ) {
-      //               console.log(_this.links[i].source, _this.links[i].target);
-      //               _this.nodes[j].symbolSize -= _this.links[i].lineStyle.width;
-      //               console.log(_this.nodes[j]);
-      //               ct += 1;
-      //             }
-      //             if (ct == 2) {
-      //               break;
-      //             }
-      //           }
-      //           let his = {
-      //             type: "delRel",
-      //             node1Name: a,
-      //             node2Name: b,
-      //             relType: _this.links[i].value,
-      //           };
-      //           _this.links.splice(i, 1);
-      //           _this.history.push(his);
-      //           break;
-      //         }
-      //       }
-      //     }
-      //   }
-      //   if (_this.autoSave) {
-      //     _this.saveData();
-      //   }
-      //   _this.updateGraph();
-      // });
+      main.on("mouseup", { dataType: "node" }, function () {
+        _this.notNeedUpdate = true;
+        _this.updateGraph();
+      });
+      main.on("dblclick", { dataType: "edge" }, function (data) {
+        if (_this.queryMode) {
+          return; // 如果是查询模式直接返回
+        }
+        console.log("deleteRel", data);
+        for (var i = 0; i < _this.links.length; i++) {
+          if (data.dataType == "node") {
+            console.log("发生传递");
+            break;
+          }
+          if (data.data.source == _this.links[i].source) {
+            if (data.data.target == _this.links[i].target) {
+              if (data.data.value == _this.links[i].value) {
+                let a = null;
+                let b = null;
+                for (var j = 0; j < _this.options.length; j++) {
+                  if (_this.options[j].value == _this.links[i].source) {
+                    a = _this.options[j].label;
+                  }
+                  if (_this.options[j].value == _this.links[i].target) {
+                    b = _this.options[j].label;
+                  }
+                  if (a && b) {
+                    break;
+                  }
+                }
+                var ct = 0;
+                for (j = 0; j < _this.nodes.length; j++) {
+                  if (
+                    _this.nodes[j].id == _this.links[i].source ||
+                    _this.nodes[j].id == _this.links[i].target
+                  ) {
+                    console.log(_this.links[i].source, _this.links[i].target);
+                    _this.nodes[j].symbolSize -= _this.links[i].lineStyle.width;
+                    console.log(_this.nodes[j]);
+                    ct += 1;
+                  }
+                  if (ct == 2) {
+                    break;
+                  }
+                }
+                let his = {
+                  type: "delRel",
+                  node1Name: a,
+                  node2Name: b,
+                  relType: _this.links[i].value,
+                };
+                _this.links.splice(i, 1);
+                _this.history.push(his);
+                break;
+              }
+            }
+          }
+        }
+        if (_this.autoSave) {
+          _this.saveData();
+        }
+        _this.updateGraph();
+      });
     },
     initAxios() {
       const req = this.axios.create({
@@ -786,7 +852,7 @@ export default {
           username: "neo4j",
           password: "159753zzz",
         },
-        timeout: 8000,
+        timeout: 20000,
         method: "post",
       });
       this.ax = req;
@@ -795,6 +861,20 @@ export default {
       // 清空列表数据
       this.filtedLinks.splice(0);
       this.filtedNodes.splice(0);
+      this.options.splice(0);
+      console.log(this.notNeedUpdate)
+      // 如果不需要更新
+      if (this.notNeedUpdate) {
+        // 下次需要更新
+        this.notNeedUpdate = false
+      } else {
+        this.node1 = {};
+        this.node2 = {};
+        this.node3 = {};
+        this.node1Id = "";
+        this.node2Id = "";
+        this.node3Id = "";
+      }
 
       // 过滤节点状态
       for (let node of this.nodes) {
@@ -826,12 +906,29 @@ export default {
                 2 + 40 * (2 + Math.log10(node.symbolSize / 100));
             }
             this.filtedNodes.push(newNode);
+            // 添加完之后也要添加option
+            var option = {
+              value: newNode.id,
+              label: newNode.name,
+            };
+            this.options.push(option);
           }
           continue;
         }
         newNode.symbolSize = 2 + 40 * (2 + Math.log10(node.symbolSize / 100));
         this.filtedNodes.push(newNode);
+        // 添加完之后也要添加option
+        option = {
+          value: newNode.id,
+          label: newNode.name,
+        };
+        this.options.push(option);
       }
+
+      // 对 options 进行排序
+      this.options.sort(function (a, b) {
+        return ("" + a.label).localeCompare(b.label);
+      });
 
       // 补充显示参数，过滤边
       for (let link of this.links) {
@@ -899,26 +996,28 @@ export default {
         let maxIndex = 0;
         let max = 0;
         for (let key in this.responseData) {
-          let path = this.responseData[key]
+          let path = this.responseData[key];
           const entitys = path.row[0];
           let sum = 0;
           let count = 0;
-          for (let entity of entitys) {  // 计算权重
+          for (let entity of entitys) {
+            // 计算权重
             if (entity.id == null) {
               count += 1;
-              sum += Number(entity.width)
+              sum += Number(entity.width);
             }
           }
           let value = sum / count;
-          console.log(value)
-          if (value > max) {  // 如果更大则记录
+          console.log(value);
+          if (value > max) {
+            // 如果更大则记录
             max = value;
             maxIndex = key;
           }
         }
-        let foo = this.responseData[maxIndex]
-        this.responseData.splice(0)
-        this.responseData.push(foo)
+        let foo = this.responseData[maxIndex];
+        this.responseData.splice(0);
+        this.responseData.push(foo);
       }
 
       for (let path of this.responseData) {
@@ -974,7 +1073,7 @@ export default {
     queryRequest(statements, filter) {
       this.loading = true;
       this.ax
-        .post("http://39.105.230.175:7474/db/neo4j/tx/commit", {
+        .post("http://192.168.103.246:7474/db/neo4j/tx/commit", {
           statements: statements,
         })
         .then((response) => {
@@ -1043,7 +1142,7 @@ export default {
             name1: this.node1.name,
             name2: this.node2.name,
             lim: this.limit,
-          }, 
+          },
         },
       ];
       this.queryRequest(statements);
