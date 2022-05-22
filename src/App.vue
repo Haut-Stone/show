@@ -326,11 +326,7 @@
             </el-scrollbar>
           </el-container>
           <el-container class="aside-box">
-            <el-button
-              class="select-button"
-              type="success"
-              @click="saveData"
-              :disabled="queryMode"
+            <el-button class="select-button" type="success" @click="saveData"
               >保存</el-button
             >
             <input id="file" type="file" accept=".json" :disabled="queryMode" />
@@ -505,7 +501,7 @@ export default {
   methods: {
     initData() {
       // 获取完整的图文件
-      var graph = require("./datas/2022-5-6-23-14-29.json");
+      var graph = require("./datas/train-2022-1-4-17-29-55");
       this.graph = graph;
       this.nodes = graph.nodes;
       this.links = graph.links;
@@ -862,11 +858,11 @@ export default {
       this.filtedLinks.splice(0);
       this.filtedNodes.splice(0);
       this.options.splice(0);
-      console.log(this.notNeedUpdate)
+      console.log(this.notNeedUpdate);
       // 如果不需要更新
       if (this.notNeedUpdate) {
         // 下次需要更新
-        this.notNeedUpdate = false
+        this.notNeedUpdate = false;
       } else {
         this.node1 = {};
         this.node2 = {};
@@ -1045,6 +1041,7 @@ export default {
       for (let key of queryNodes) {
         let node = key[1];
         node.category = Number(node.category);
+        node.rawSymbolSize = node.symbolSize
         node.symbolSize =
           2 + 40 * (2 + Math.log10(Number(node.symbolSize) / 100));
         node.fixed = this.fixNodes;
@@ -1073,7 +1070,7 @@ export default {
     queryRequest(statements, filter) {
       this.loading = true;
       this.ax
-        .post("http://192.168.103.246:7474/db/neo4j/tx/commit", {
+        .post("http://39.105.230.175:7474/db/neo4j/tx/commit", {
           statements: statements,
         })
         .then((response) => {
@@ -1453,6 +1450,23 @@ export default {
         categories: this.graph.categories,
         history: this.history,
       };
+
+      // 如果是查询模式则只保留过滤后的节点
+      if (this.queryMode) {
+        for (let node of this.filtedNodes) {
+          node.symbolSize = node.rawSymbolSize
+        }
+        for (let link of this.filtedLinks) {
+          link.lineStyle.width = link.lineStyle.width / 2
+        }
+        save = {
+          nodes: this.filtedNodes,
+          links: this.filtedLinks,
+          categories: this.graph.categories,
+          history: [],
+        };
+      }
+
       let yy = new Date().getFullYear();
       let mm = new Date().getMonth() + 1;
       let dd = new Date().getDate();
